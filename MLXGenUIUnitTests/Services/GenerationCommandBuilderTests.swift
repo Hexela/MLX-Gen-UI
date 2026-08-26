@@ -37,4 +37,35 @@ struct GenerationCommandBuilderTests {
         let imageIndex = try #require(command.arguments.firstIndex(of: "--image"))
         #expect(command.arguments[imageIndex + 1] == "/tmp/source image.png")
     }
+
+    /// The single-transformer 5B model must not receive the A14B-only secondary guidance option.
+    @Test func fiveBModelOmitsSecondaryGuidance() throws {
+        var task = GenerationPreset.animateImage.makeTask()
+        task.modelIdentifier = "AbstractFramework/wan2.2-ti2v-5b-diffusers-8bit"
+        task.sourceImageURL = URL(filePath: "/tmp/source.png")
+
+        let command = try GenerationCommandBuilder().makeCommand(
+            for: task,
+            executableURL: URL(filePath: "/tmp/mlxgen"),
+            outputURL: URL(filePath: "/tmp/output.mp4")
+        )
+
+        #expect(command.arguments.contains("--guidance"))
+        #expect(command.arguments.contains("--guidance-2") == false)
+    }
+
+    /// A14B models use their second guidance value for boundary-routed generation.
+    @Test func a14BModelIncludesSecondaryGuidance() throws {
+        var task = GenerationPreset.qualityTextVideo.makeTask()
+        task.prompt = "A lighthouse in a storm."
+
+        let command = try GenerationCommandBuilder().makeCommand(
+            for: task,
+            executableURL: URL(filePath: "/tmp/mlxgen"),
+            outputURL: URL(filePath: "/tmp/output.mp4")
+        )
+
+        let guidanceIndex = try #require(command.arguments.firstIndex(of: "--guidance-2"))
+        #expect(command.arguments[guidanceIndex + 1] == String(task.secondaryGuidance))
+    }
 }

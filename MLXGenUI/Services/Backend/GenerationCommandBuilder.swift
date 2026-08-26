@@ -33,9 +33,12 @@ struct GenerationCommandBuilder: Sendable {
             "--frames", String(task.frameCount),
             "--fps", String(task.framesPerSecond),
             "--steps", String(task.stepCount),
-            "--guidance", String(task.guidance),
-            "--guidance-2", String(task.secondaryGuidance)
+            "--guidance", String(task.guidance)
         ]
+
+        if WanModel.model(withIdentifier: task.modelIdentifier)?.supportsSecondaryGuidance == true {
+            arguments += ["--guidance-2", String(task.secondaryGuidance)]
+        }
 
         if task.negativePrompt.isEmpty == false {
             arguments += ["--negative-prompt", task.negativePrompt]

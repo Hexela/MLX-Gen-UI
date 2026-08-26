@@ -14,6 +14,8 @@ struct WanModel: Identifiable, Equatable, Hashable, Sendable {
     let summary: String
     /// The model's recommended frame count for a stable individual shot.
     let recommendedSegmentFrames: Int
+    /// Whether the model uses two-transformer boundary routing and accepts secondary guidance.
+    let supportsSecondaryGuidance: Bool
     /// Ordered frame counts accepted as continuation context.
     let supportedContextFrameCounts: [Int]
     /// The paired image-to-video model used to continue a text-generated first segment.
@@ -28,6 +30,7 @@ struct WanModel: Identifiable, Equatable, Hashable, Sendable {
             storageSummary: "Large download; substantial unified memory required",
             summary: "The preferred quality-focused model for video generated entirely from text.",
             recommendedSegmentFrames: 81,
+            supportsSecondaryGuidance: true,
             supportedContextFrameCounts: [5, 9, 13],
             continuationModelIdentifier: "AbstractFramework/wan2.2-i2v-a14b-diffusers-8bit"
         ),
@@ -38,6 +41,7 @@ struct WanModel: Identifiable, Equatable, Hashable, Sendable {
             storageSummary: "Large download; substantial unified memory required",
             summary: "Animates a starting image while preserving its subject and composition.",
             recommendedSegmentFrames: 81,
+            supportsSecondaryGuidance: true,
             supportedContextFrameCounts: [5, 9, 13],
             continuationModelIdentifier: "AbstractFramework/wan2.2-i2v-a14b-diffusers-8bit"
         ),
@@ -48,6 +52,7 @@ struct WanModel: Identifiable, Equatable, Hashable, Sendable {
             storageSummary: "Approximately 17 GiB",
             summary: "A smaller package that supports both text and starting-image workflows.",
             recommendedSegmentFrames: 121,
+            supportsSecondaryGuidance: false,
             supportedContextFrameCounts: [],
             continuationModelIdentifier: nil
         )

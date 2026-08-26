@@ -19,4 +19,13 @@ struct WanModelTests {
         #expect(WanModel.model(withIdentifier: expected.id) == expected)
         #expect(WanModel.model(withIdentifier: "unknown/model") == nil)
     }
+
+    @Test func onlyBoundaryRoutedModelsSupportSecondaryGuidance() throws {
+        let fiveBModel = try #require(
+            WanModel.model(withIdentifier: "AbstractFramework/wan2.2-ti2v-5b-diffusers-8bit")
+        )
+
+        #expect(fiveBModel.supportsSecondaryGuidance == false)
+        #expect(WanModel.catalog.filter(\.supportsSecondaryGuidance).count == 2)
+    }
 }

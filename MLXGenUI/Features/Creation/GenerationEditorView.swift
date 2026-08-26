@@ -254,8 +254,14 @@ struct GenerationEditorView: View {
                     .help("More steps can improve detail but take longer. 20 is a good quality default; about 12 is useful for previews.")
                 TextField("Guidance", value: task.guidance, format: .number.precision(.fractionLength(0...2)))
                     .help("Controls how strongly the first generation stage follows the prompt. 4 is the recommended balanced default.")
-                TextField("Secondary guidance", value: task.secondaryGuidance, format: .number.precision(.fractionLength(0...2)))
-                    .help("Controls prompt strength in the second generation stage. 3 is the recommended balanced default.")
+                if WanModel.model(withIdentifier: task.wrappedValue.modelIdentifier)?.supportsSecondaryGuidance == true {
+                    TextField("Secondary guidance", value: task.secondaryGuidance, format: .number.precision(.fractionLength(0...2)))
+                        .help("Controls prompt strength in the second A14B generation stage. 3 is the recommended balanced default.")
+                } else {
+                    LabeledContent("Secondary guidance", value: "Not used by this model")
+                        .foregroundStyle(.secondary)
+                        .help("Secondary guidance is only available for A14B models with two-transformer boundary routing. The selected 5B model uses its primary guidance value instead.")
+                }
                 Toggle("Use low-memory mode", isOn: task.usesLowMemoryMode)
                     .help("Reduces peak memory use, usually with a speed cost. Keep this on unless you have ample unified memory and want maximum speed.")
                 Toggle("Write generation metadata", isOn: task.writesMetadata)
