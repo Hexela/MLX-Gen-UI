@@ -45,11 +45,7 @@ struct AppView: View {
                 description: "Completed local generations will appear here."
             )
         case .models:
-            PlaceholderView(
-                title: "Models",
-                systemImage: "shippingbox",
-                description: "Wan model download and storage management is coming next."
-            )
+            ModelsView()
         case nil:
             ContentUnavailableView("Choose a Section", systemImage: "sidebar.left")
         }

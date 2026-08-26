@@ -8,7 +8,9 @@ The project is in active development. The current foundation provides:
 - Wan text-to-video and image-to-video task editing.
 - Built-in presets with documented, reproducible defaults.
 - Validation and a copyable `mlxgen` command preview.
-- A native SwiftUI app structure ready for model downloads and generation progress.
+- Confirmed installation and update actions using Homebrew and `uv` directly.
+- A curated Wan model catalog with explicit downloads.
+- Cancellable generation with structured MLX-Gen progress and bounded diagnostics.
 
 ## Requirements
 

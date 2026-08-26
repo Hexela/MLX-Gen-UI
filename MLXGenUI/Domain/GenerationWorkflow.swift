@@ -1,7 +1,7 @@
 import Foundation
 
 /// A video-generation workflow supported by the initial application release.
-enum GenerationWorkflow: String, Codable, CaseIterable, Identifiable, Sendable {
+enum GenerationWorkflow: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
     /// Generates a video using only a text prompt.
     case textToVideo
     /// Animates a user-selected starting image using a text prompt.

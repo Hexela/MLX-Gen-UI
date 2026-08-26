@@ -22,6 +22,15 @@ The Xcode project is the source of truth and the app has no third-party Swift de
 - ``GenerationPreset``
 - ``GenerationTaskValidator``
 - ``GenerationCommandBuilder``
+- ``BackendProcessRunner``
+- ``MLXGenEvent``
+- ``MLXGenEventDecoder``
+
+### Models and maintenance
+
+- ``WanModel``
+- ``BackendAction``
+- ``BackendActionCommandBuilder``
 
 ### System readiness
 

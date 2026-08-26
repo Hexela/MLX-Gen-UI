@@ -36,4 +36,9 @@ enum SystemStatus: Equatable, Sendable {
         case .unavailable: "xmark.circle.fill"
         }
     }
+
+    /// `true` when every backend dependency is available.
+    var isReady: Bool {
+        if case .ready = self { true } else { false }
+    }
 }

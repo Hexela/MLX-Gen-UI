@@ -9,6 +9,8 @@ struct GenerationEditorView: View {
     @State private var isChoosingImage = false
     /// Controls presentation of advanced sampling settings.
     @State private var showsAdvancedSettings = false
+    /// Controls confirmation before a potentially long generation begins.
+    @State private var isConfirmingGeneration = false
 
     /// The generation editor hierarchy.
     var body: some View {
@@ -21,6 +23,8 @@ struct GenerationEditorView: View {
             outputSection(task: $appModel.task)
             advancedSection(task: $appModel.task)
             commandPreviewSection
+            generationSection
+            BackendOperationView()
         }
         .formStyle(.grouped)
         .navigationTitle("Create Video")
@@ -134,6 +138,40 @@ struct GenerationEditorView: View {
                 .font(.system(.callout, design: .monospaced))
                 .textSelection(.enabled)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Starts generation only after the user acknowledges its potential cost.
+    private var generationSection: some View {
+        Section {
+            Button("Generate Video", systemImage: "sparkles.rectangle.stack") {
+                isConfirmingGeneration = true
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(
+                GenerationTaskValidator().issues(in: appModel.task).isEmpty == false
+                    || appModel.systemStatus.isReady == false
+                    || appModel.backendOperation?.isRunning == true
+            )
+            .confirmationDialog(
+                "Start this generation?",
+                isPresented: $isConfirmingGeneration,
+                titleVisibility: .visible
+            ) {
+                Button("Generate") {
+                    Task(name: "Generate video") {
+                        await appModel.generateVideo()
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Local video generation may use substantial memory and take many minutes or hours.")
+            }
+
+            if appModel.systemStatus.isReady == false {
+                Text("Complete backend setup in System Status before generating.")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
