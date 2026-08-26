@@ -46,6 +46,11 @@ final class AppModel {
     /// A user-facing persistence error from the task or video library.
     private(set) var libraryError: String?
 
+    /// The best duration prediction supported by successful local generations.
+    var generationTimeEstimate: GenerationTimeEstimate? {
+        GenerationTimeEstimator().estimate(for: task, from: generatedVideos)
+    }
+
     /// The service used to inspect locally installed command-line tools.
     private let systemStatusService: SystemStatusService
 
@@ -186,36 +191,39 @@ final class AppModel {
 
     /// Starts generation using a unique output file in the user's Movies directory.
     func generateVideo() async {
-        let issues = GenerationTaskValidator().issues(in: task)
+        let submittedTask = task
+        let issues = GenerationTaskValidator().issues(in: submittedTask)
         guard issues.isEmpty else {
             backendOperationError = issues.map(\.message).joined(separator: " ")
             return
         }
 
-        await recordGenerationAttempt()
+        await recordGenerationAttempt(for: submittedTask)
+        let generationStartedAt = ContinuousClock.now
 
         do {
             let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-            let outputURL = task.outputURL ?? homeDirectory
+            let outputURL = submittedTask.outputURL ?? homeDirectory
                 .appending(path: "Movies")
                 .appending(
-                    path: "mlxgen-\(task.identifier.uuidString.prefix(8))-\(UUID().uuidString.prefix(8)).mp4"
+                    path: "mlxgen-\(submittedTask.identifier.uuidString.prefix(8))-\(UUID().uuidString.prefix(8)).mp4"
                 )
-            guard let model = WanModel.model(withIdentifier: task.modelIdentifier) else {
+            guard let model = WanModel.model(withIdentifier: submittedTask.modelIdentifier) else {
                 throw LongVideoGenerationError.unknownModel
             }
-            let plan = LongVideoPlanner().makePlan(for: task, model: model)
+            let plan = LongVideoPlanner().makePlan(for: submittedTask, model: model)
             let needsPostProcessing = plan.requiresAssembly
                 || plan.segments[0].frameCount != plan.targetFrameCount
             let completed: Bool
             if needsPostProcessing {
                 completed = try await generateLongVideo(
+                    task: submittedTask,
                     plan: plan,
                     outputURL: outputURL,
                     executableURL: homeDirectory.appending(path: ".local/bin/mlxgen")
                 )
             } else {
-                var oneShotTask = task
+                var oneShotTask = submittedTask
                 oneShotTask.frameCount = plan.segments[0].frameCount
                 oneShotTask.targetDurationSeconds = nil
                 let command = try GenerationCommandBuilder().makeCommand(
@@ -223,14 +231,16 @@ final class AppModel {
                     executableURL: homeDirectory.appending(path: ".local/bin/mlxgen"),
                     outputURL: outputURL
                 )
-                completed = await run(command, title: "Generating \(task.name)")
+                completed = await run(command, title: "Generating \(submittedTask.name)")
             }
             if completed {
+                let elapsed = generationStartedAt.duration(to: .now)
                 let record = GeneratedVideoRecord(
                     id: UUID(),
-                    task: task,
+                    task: submittedTask,
                     outputURL: outputURL,
-                    createdAt: .now
+                    createdAt: .now,
+                    generationDurationSeconds: elapsed.seconds
                 )
                 generatedVideos = try await libraryStore.add(record, to: generatedVideos)
                 libraryError = nil
@@ -241,7 +251,7 @@ final class AppModel {
     }
 
     /// Persists an immutable snapshot before the backend starts so failed attempts remain reusable.
-    private func recordGenerationAttempt() async {
+    private func recordGenerationAttempt(for task: GenerationTask) async {
         let record = GenerationHistoryRecord(id: UUID(), task: task, attemptedAt: .now)
         generationHistory.insert(record, at: 0)
 
@@ -255,6 +265,7 @@ final class AppModel {
 
     /// Generates every planned segment, prepares handovers, and assembles the final MP4.
     private func generateLongVideo(
+        task: GenerationTask,
         plan: LongVideoPlan,
         outputURL: URL,
         executableURL: URL
@@ -410,6 +421,14 @@ final class AppModel {
             backendOperation?.isComplete = true
             backendOperation?.isRunning = false
         }
+    }
+}
+
+private extension Duration {
+    /// Converts a monotonic clock duration into seconds for persisted performance history.
+    var seconds: Double {
+        let parts = components
+        return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
     }
 }
 

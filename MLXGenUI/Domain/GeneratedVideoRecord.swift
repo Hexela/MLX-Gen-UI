@@ -10,4 +10,6 @@ struct GeneratedVideoRecord: Codable, Equatable, Hashable, Identifiable, Sendabl
     var outputURL: URL
     /// The time generation completed.
     var createdAt: Date
+    /// Wall-clock time spent generating and post-processing the successful video.
+    var generationDurationSeconds: Double? = nil
 }

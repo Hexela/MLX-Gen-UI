@@ -32,13 +32,29 @@ struct LibraryStoreTests {
             id: UUID(),
             task: task,
             outputURL: directoryURL.appending(path: "result.mp4"),
-            createdAt: .now
+            createdAt: .now,
+            generationDurationSeconds: 123
         )
 
         _ = try await store.add(record, to: [])
         let loaded = try await store.loadVideos()
 
         #expect(loaded == [record])
+    }
+
+    /// Video records written before timing was introduced should continue to decode.
+    @Test func generatedVideoWithoutTimingRemainsCompatible() throws {
+        let record = GeneratedVideoRecord(
+            id: UUID(),
+            task: GenerationPreset.quickTextPreview.makeTask(),
+            outputURL: URL(filePath: "/tmp/legacy.mp4"),
+            createdAt: .now
+        )
+        let data = try JSONEncoder().encode(record)
+
+        let decoded = try JSONDecoder().decode(GeneratedVideoRecord.self, from: data)
+
+        #expect(decoded.generationDurationSeconds == nil)
     }
 
     /// Every generation attempt should retain all submitted task options independently.

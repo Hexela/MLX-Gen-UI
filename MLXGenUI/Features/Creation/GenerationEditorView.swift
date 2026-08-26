@@ -303,17 +303,23 @@ struct GenerationEditorView: View {
     /// Starts generation only after the user acknowledges its potential cost.
     private var generationSection: some View {
         Section {
-            Button("Generate Video", systemImage: "sparkles.rectangle.stack") {
-                isConfirmingGeneration = true
+            HStack(spacing: 16) {
+                Button("Generate Video", systemImage: "sparkles.rectangle.stack") {
+                    isConfirmingGeneration = true
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    GenerationTaskValidator().issues(in: appModel.task).isEmpty == false
+                        || appModel.systemStatus.isReady == false
+                        || selectedModelStatus.isInstalled == false
+                        || requiredContinuationModelStatus.isInstalled == false
+                        || appModel.backendOperation?.isRunning == true
+                )
+
+                Spacer(minLength: 0)
+
+                GenerationTimeEstimateView(estimate: appModel.generationTimeEstimate)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(
-                GenerationTaskValidator().issues(in: appModel.task).isEmpty == false
-                    || appModel.systemStatus.isReady == false
-                    || selectedModelStatus.isInstalled == false
-                    || requiredContinuationModelStatus.isInstalled == false
-                    || appModel.backendOperation?.isRunning == true
-            )
             .confirmationDialog(
                 "Start this generation?",
                 isPresented: $isConfirmingGeneration,
