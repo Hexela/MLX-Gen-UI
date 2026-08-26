@@ -14,6 +14,8 @@ struct GenerationEditorView: View {
     @State private var isConfirmingGeneration = false
     /// Controls export of the current portable task document.
     @State private var isExportingTask = false
+    /// Pixel information read from the selected starting image.
+    @State private var sourceImageDetails: SourceImageDetails?
 
     /// The generation editor hierarchy.
     var body: some View {
@@ -56,7 +58,11 @@ struct GenerationEditorView: View {
         }
         .task {
             selectCompatibleModel(for: appModel.task.workflow)
+            refreshSourceImageDetails()
             await appModel.refreshModelStatuses()
+        }
+        .onChange(of: appModel.task.sourceImageURL) {
+            refreshSourceImageDetails()
         }
     }
 
@@ -70,6 +76,7 @@ struct GenerationEditorView: View {
                     Text(preset.title).tag(preset)
                 }
             }
+            .help("Choose a ready-made set of options. Quick Text Preview is best for testing an idea; use a quality or image preset for a finished result.")
             .onChange(of: appModel.selectedPreset) { _, preset in
                 appModel.apply(preset)
             }
@@ -93,6 +100,7 @@ struct GenerationEditorView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .help("Choose Text to Video to create everything from a prompt, or Image to Video when you want to animate a specific starting image.")
             .onChange(of: task.wrappedValue.workflow) { _, workflow in
                 selectCompatibleModel(for: workflow)
             }
@@ -108,6 +116,7 @@ struct GenerationEditorView: View {
                     }
                 }
                 .accessibilityHint("Selects the Wan model used for this generation")
+                .help("Selects the generation model. The first compatible model is the recommended quality-focused choice; TI2V 5B uses less storage and supports both workflows.")
             } else {
                 LabeledContent("Model", value: "Selecting a compatible model…")
                     .foregroundStyle(.secondary)
@@ -133,7 +142,35 @@ struct GenerationEditorView: View {
                         Button("Choose…") {
                             isChoosingImage = true
                         }
+                        .help("Choose a clear, high-resolution image with the same shape as the video canvas for the most stable result.")
                     }
+                }
+
+                if let sourceImageDetails {
+                    LabeledContent("Image resolution", value: sourceImageDetails.resolutionDescription)
+
+                    let recommendations = sourceImageDetails.recommendations(
+                        targetWidth: task.wrappedValue.width,
+                        targetHeight: task.wrappedValue.height
+                    )
+                    if recommendations.isEmpty {
+                        Label(
+                            "This image is a good size and shape for the selected canvas.",
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .foregroundStyle(.green)
+                    } else {
+                        ForEach(recommendations, id: \.self) { recommendation in
+                            Label(recommendation, systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                } else if task.wrappedValue.sourceImageURL != nil {
+                    Label(
+                        "The image resolution could not be read. For best results, use an image at least as large as the video canvas and with the same aspect ratio.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(.orange)
                 }
             }
         }
@@ -142,10 +179,23 @@ struct GenerationEditorView: View {
     /// Controls for positive and negative generation prompts.
     private func promptSection(task: Binding<GenerationTask>) -> some View {
         Section("Prompt") {
-            TextField("Describe the scene and motion", text: task.prompt, axis: .vertical)
-                .lineLimit(4...10)
-            TextField("Content to avoid (optional)", text: task.negativePrompt, axis: .vertical)
-                .lineLimit(2...6)
+            VStack(alignment: .leading) {
+                Text("Describe the scene and motion")
+                TextField("Describe the scene and motion", text: task.prompt, axis: .vertical)
+                    .labelsHidden()
+                    .lineLimit(4...10)
+                    .accessibilityLabel("Describe the scene and motion")
+                    .help("Describe the subject, setting, movement, and camera motion. Specific visual details and one clear action usually give the most coherent result. For example: A slow camera push toward a lighthouse as waves break below.")
+            }
+
+            VStack(alignment: .leading) {
+                Text("Content to avoid (optional)")
+                TextField("Content to avoid", text: task.negativePrompt, axis: .vertical)
+                    .labelsHidden()
+                    .lineLimit(2...6)
+                    .accessibilityLabel("Content to avoid")
+                    .help("List unwanted visual traits, separated by commas. For example: text, watermark, flicker, distorted hands. A useful default is: text, watermark, flicker, distorted subject, unstable background.")
+            }
         }
     }
 
@@ -154,19 +204,23 @@ struct GenerationEditorView: View {
         Section("Video") {
             HStack {
                 TextField("Width", value: task.width, format: .number)
+                    .help("Sets horizontal resolution. 832 is a good quality landscape width; 480 is faster and uses less memory.")
                 Text("×")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 TextField("Height", value: task.height, format: .number)
+                    .help("Sets vertical resolution. Use 480 for landscape or 832 for portrait, paired with the corresponding width.")
             }
             LabeledContent("Canvas", value: "\(task.wrappedValue.width) × \(task.wrappedValue.height) pixels")
             Stepper("Frame rate: \(task.wrappedValue.framesPerSecond) fps", value: task.framesPerSecond, in: 1...60)
+                .help("Controls playback smoothness. 16 fps is the recommended model-native default; higher values require more generated frames for the same duration.")
             TextField(
                 "Desired duration (seconds)",
                 value: targetDurationBinding,
                 format: .number.precision(.fractionLength(0...2))
             )
             .accessibilityHint("Sets the exact duration of the finished, automatically assembled video")
+            .help("Sets the finished video length. Short clips are quicker and more consistent; longer clips are generated as multiple joined segments.")
             if let plan = longVideoPlan {
                 LabeledContent(
                     "Generation plan",
@@ -186,6 +240,7 @@ struct GenerationEditorView: View {
                         .truncationMode(.middle)
                         .foregroundStyle(task.wrappedValue.outputURL == nil ? .secondary : .primary)
                     Button("Choose…", action: chooseOutputURL)
+                        .help("Choose where to save the finished MP4. Leave unchanged to save it automatically in Movies.")
                 }
             }
         }
@@ -196,10 +251,15 @@ struct GenerationEditorView: View {
         Section {
             DisclosureGroup("Advanced Settings", isExpanded: $showsAdvancedSettings) {
                 Stepper("Denoising steps: \(task.wrappedValue.stepCount)", value: task.stepCount, in: 1...100)
+                    .help("More steps can improve detail but take longer. 20 is a good quality default; about 12 is useful for previews.")
                 TextField("Guidance", value: task.guidance, format: .number.precision(.fractionLength(0...2)))
+                    .help("Controls how strongly the first generation stage follows the prompt. 4 is the recommended balanced default.")
                 TextField("Secondary guidance", value: task.secondaryGuidance, format: .number.precision(.fractionLength(0...2)))
+                    .help("Controls prompt strength in the second generation stage. 3 is the recommended balanced default.")
                 Toggle("Use low-memory mode", isOn: task.usesLowMemoryMode)
+                    .help("Reduces peak memory use, usually with a speed cost. Keep this on unless you have ample unified memory and want maximum speed.")
                 Toggle("Write generation metadata", isOn: task.writesMetadata)
+                    .help("Saves generation settings beside the video so the result can be reproduced. Keeping this on is recommended.")
             }
         }
     }
@@ -338,6 +398,12 @@ struct GenerationEditorView: View {
     private func selectImage(_ result: Result<[URL], any Error>) {
         guard case .success(let URLs) = result, let URL = URLs.first else { return }
         appModel.task.sourceImageURL = URL
+        sourceImageDetails = SourceImageDetails.load(from: URL)
+    }
+
+    /// Refreshes the displayed metadata when a task or starting image changes.
+    private func refreshSourceImageDetails() {
+        sourceImageDetails = appModel.task.sourceImageURL.flatMap(SourceImageDetails.load)
     }
 
     /// Presents the native macOS save panel for the generated MP4 destination.
