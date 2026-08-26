@@ -2,6 +2,10 @@
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
 
+# macOS Finder metadata
+.DS_Store
+**/.DS_Store
+
 ## User settings
 xcuserdata/
 
@@ -30,6 +34,15 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+
+# MLXGenUI local user data
+# These normally live in Application Support, but remain ignored if copied or
+# redirected into a development checkout.
+**/SavedTasks.json
+**/GenerationHistory.json
+**/GeneratedVideos.json
+**/LongVideoRuns/
+*.mlxgentask
 
 # CocoaPods
 #
