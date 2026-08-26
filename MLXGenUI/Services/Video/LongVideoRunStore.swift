@@ -17,11 +17,20 @@ actor LongVideoRunStore {
 
     /// Atomically writes the latest resumable run state.
     func save(_ run: LongVideoRun, in workspaceURL: URL) throws {
+        try FileManager.default.createDirectory(at: workspaceURL, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(run).write(
-            to: workspaceURL.appending(path: "run.json"),
-            options: .atomic
-        )
+        let data = try encoder.encode(run)
+        let manifestURL = workspaceURL.appending(path: "run.json")
+
+        do {
+            try data.write(to: manifestURL, options: .atomic)
+        } catch let error as CocoaError where error.code == .fileWriteNoPermission {
+            // Some long-running child processes can leave macOS unable to perform
+            // the temporary-file rename used by `.atomic`, even though the existing
+            // manifest itself remains writable. A direct overwrite safely preserves
+            // resumable state instead of aborting the whole generation.
+            try data.write(to: manifestURL)
+        }
     }
 }

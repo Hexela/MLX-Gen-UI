@@ -310,7 +310,13 @@ final class AppModel {
                     title: "Generating segment \(segment.index + 1) of \(plan.segments.count)"
                 ) else {
                     manifest.status = .interrupted
-                    try await longVideoRunStore.save(manifest, in: workspaceURL)
+                    do {
+                        try await longVideoRunStore.save(manifest, in: workspaceURL)
+                    } catch {
+                        backendOperation?.appendOutput(
+                            "The run manifest could not be updated: \(error.localizedDescription)"
+                        )
+                    }
                     return false
                 }
                 segmentURLs.append(segmentURL)
