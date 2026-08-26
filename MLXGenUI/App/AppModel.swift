@@ -29,23 +29,49 @@ final class AppModel {
     /// A user-facing description of the most recent backend operation error.
     private(set) var backendOperationError: String?
 
+    /// Installation and update state keyed by model repository identifier.
+    private(set) var modelStatuses: [String: ModelInstallationStatus] = Dictionary(
+        uniqueKeysWithValues: WanModel.catalog.map { ($0.id, .checking) }
+    )
+
+    /// Tasks retained in the app's local library.
+    private(set) var savedTasks: [SavedTaskRecord] = []
+
+    /// Successfully generated local video artifacts.
+    private(set) var generatedVideos: [GeneratedVideoRecord] = []
+
+    /// A user-facing persistence error from the task or video library.
+    private(set) var libraryError: String?
+
     /// The service used to inspect locally installed command-line tools.
     private let systemStatusService: SystemStatusService
 
     /// The runner that owns long-lived installation, download, and generation processes.
     private let backendProcessRunner: BackendProcessRunner
 
+    /// The service that inspects the local Hugging Face cache and Hub revisions.
+    private let modelService: HuggingFaceModelService
+
+    /// The store that persists tasks and generated-video history.
+    private let libraryStore: LibraryStore
+
     /// Creates an application model with injectable service dependencies.
     ///
     /// - Parameters:
     ///   - systemStatusService: The service that inspects backend dependencies.
     ///   - backendProcessRunner: The runner that owns long-lived backend processes.
+    ///   - modelService: The service that compares local and remote model revisions.
+    ///   - libraryStore: The store that persists task and generated-video libraries.
     init(
         systemStatusService: SystemStatusService = SystemStatusService(),
-        backendProcessRunner: BackendProcessRunner = BackendProcessRunner()
+        backendProcessRunner: BackendProcessRunner = BackendProcessRunner(),
+        modelService: HuggingFaceModelService = HuggingFaceModelService(),
+        libraryStore: LibraryStore = LibraryStore()
     ) {
         self.systemStatusService = systemStatusService
         self.backendProcessRunner = backendProcessRunner
+        self.modelService = modelService
+        self.libraryStore = libraryStore
         task = GenerationPreset.quickTextPreview.makeTask()
     }
 
@@ -82,8 +108,62 @@ final class AppModel {
             for: action,
             homeDirectory: FileManager.default.homeDirectoryForCurrentUser
         )
-        await run(command, title: action.title)
+        _ = await run(command, title: action.title)
         await refreshSystemStatus()
+        if case .downloadModel = action {
+            await refreshModelStatuses()
+        }
+    }
+
+    /// Refreshes local installation and remote update state for curated models.
+    func refreshModelStatuses() async {
+        modelStatuses = await modelService.statuses(for: WanModel.catalog)
+    }
+
+    /// Loads saved tasks and generated-video history from Application Support.
+    func loadLibraries() async {
+        do {
+            async let tasks = libraryStore.loadTasks()
+            async let videos = libraryStore.loadVideos()
+            savedTasks = try await tasks
+            generatedVideos = try await videos
+            libraryError = nil
+        } catch {
+            libraryError = error.localizedDescription
+        }
+    }
+
+    /// Saves the currently edited task to the local task library.
+    func saveCurrentTask() async {
+        do {
+            savedTasks = try await libraryStore.save(task, in: savedTasks)
+            libraryError = nil
+        } catch {
+            libraryError = error.localizedDescription
+        }
+    }
+
+    /// Replaces the editor with a task from the local library.
+    ///
+    /// - Parameter record: The saved task to load.
+    func load(_ record: SavedTaskRecord) {
+        task = record.task
+        selection = .createVideo
+    }
+
+    /// Replaces the editor with a task imported from a portable document.
+    ///
+    /// - Parameter document: The decoded portable task document.
+    func importTask(from document: GenerationTaskDocument) {
+        task = document.task
+        selection = .createVideo
+    }
+
+    /// Sets the destination used by the next generation.
+    ///
+    /// - Parameter URL: The user-selected MP4 destination.
+    func setOutputURL(_ URL: URL) {
+        task.outputURL = URL
     }
 
     /// Starts generation using a unique output file in the user's Movies directory.
@@ -96,15 +176,27 @@ final class AppModel {
 
         do {
             let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-            let outputURL = homeDirectory
+            let outputURL = task.outputURL ?? homeDirectory
                 .appending(path: "Movies")
-                .appending(path: "mlxgen-\(task.identifier.uuidString.prefix(8)).mp4")
+                .appending(
+                    path: "mlxgen-\(task.identifier.uuidString.prefix(8))-\(UUID().uuidString.prefix(8)).mp4"
+                )
             let command = try GenerationCommandBuilder().makeCommand(
                 for: task,
                 executableURL: homeDirectory.appending(path: ".local/bin/mlxgen"),
                 outputURL: outputURL
             )
-            await run(command, title: "Generating \(task.name)")
+            let completed = await run(command, title: "Generating \(task.name)")
+            if completed {
+                let record = GeneratedVideoRecord(
+                    id: UUID(),
+                    task: task,
+                    outputURL: outputURL,
+                    createdAt: .now
+                )
+                generatedVideos = try await libraryStore.add(record, to: generatedVideos)
+                libraryError = nil
+            }
         } catch {
             backendOperationError = error.localizedDescription
         }
@@ -116,7 +208,7 @@ final class AppModel {
     }
 
     /// Consumes a backend stream and reduces it into user-visible operation state.
-    private func run(_ command: GenerationCommand, title: String) async {
+    private func run(_ command: GenerationCommand, title: String) async -> Bool {
         backendOperation = BackendOperationState(title: title)
         backendOperationError = nil
 
@@ -125,13 +217,16 @@ final class AppModel {
             for try await event in events {
                 apply(event)
             }
+            return backendOperation?.isComplete == true
         } catch is CancellationError {
             backendOperation?.message = "Cancelled"
             backendOperation?.isRunning = false
+            return false
         } catch {
             backendOperation?.message = "Stopped"
             backendOperation?.isRunning = false
             backendOperationError = error.localizedDescription
+            return false
         }
     }
 

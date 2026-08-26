@@ -15,6 +15,8 @@ The Xcode project is the source of truth and the app has no third-party Swift de
 - <doc:GettingStarted>
 - <doc:Architecture>
 - <doc:BackendIntegration>
+- <doc:TaskDocumentsAndHistory>
+- <doc:ModelManagement>
 
 ### Generation
 
@@ -31,6 +33,15 @@ The Xcode project is the source of truth and the app has no third-party Swift de
 - ``WanModel``
 - ``BackendAction``
 - ``BackendActionCommandBuilder``
+- ``HuggingFaceModelService``
+- ``ModelInstallationStatus``
+
+### Documents and history
+
+- ``GenerationTaskDocument``
+- ``LibraryStore``
+- ``SavedTaskRecord``
+- ``GeneratedVideoRecord``
 
 ### System readiness
 

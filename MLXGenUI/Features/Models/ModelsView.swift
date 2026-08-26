@@ -17,33 +17,37 @@ struct ModelsView: View {
 
             ForEach(WanModel.catalog) { model in
                 Section(model.name) {
+                    let status = appModel.modelStatuses[model.id] ?? .checking
                     Text(model.summary)
+                    Label(status.title, systemImage: status.systemImage)
                     LabeledContent("Workflows", value: workflowSummary(for: model))
                     LabeledContent("Storage", value: model.storageSummary)
                     Text(model.id)
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
                         .foregroundStyle(.secondary)
-                    Button("Download Model", systemImage: "arrow.down.circle") {
-                        pendingDownload = model
-                    }
-                    .disabled(appModel.backendOperation?.isRunning == true)
-                    .confirmationDialog(
-                        "Download \(model.name)?",
-                        isPresented: downloadConfirmation(for: model),
-                        titleVisibility: .visible
-                    ) {
-                        Button("Download") {
-                            pendingDownload = nil
-                            Task(name: "Download \(model.name)") {
-                                await appModel.perform(.downloadModel(model))
+                    if let actionTitle = status.actionTitle {
+                        Button(actionTitle, systemImage: "arrow.down.circle") {
+                            pendingDownload = model
+                        }
+                        .disabled(appModel.backendOperation?.isRunning == true)
+                        .confirmationDialog(
+                            "\(actionTitle): \(model.name)?",
+                            isPresented: downloadConfirmation(for: model),
+                            titleVisibility: .visible
+                        ) {
+                            Button(actionTitle) {
+                                pendingDownload = nil
+                                Task(name: "Download \(model.name)") {
+                                    await appModel.perform(.downloadModel(model))
+                                }
                             }
+                            Button("Cancel", role: .cancel) {
+                                pendingDownload = nil
+                            }
+                        } message: {
+                            Text("MLX-Gen will reuse unchanged cached files. New or changed files may still require a large download.")
                         }
-                        Button("Cancel", role: .cancel) {
-                            pendingDownload = nil
-                        }
-                    } message: {
-                        Text("This may download tens of gigabytes and can take a long time.")
                     }
                 }
             }
@@ -52,6 +56,16 @@ struct ModelsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Models")
+        .task {
+            await appModel.refreshModelStatuses()
+        }
+        .toolbar {
+            Button("Refresh Models", systemImage: "arrow.clockwise") {
+                Task(name: "Refresh model status") {
+                    await appModel.refreshModelStatuses()
+                }
+            }
+        }
     }
 
     /// Creates a readable workflow list for a model.

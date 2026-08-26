@@ -1,7 +1,7 @@
 import Foundation
 
 /// All values needed to reproduce one MLX-Gen Wan video-generation request.
-struct GenerationTask: Codable, Equatable, Sendable {
+struct GenerationTask: Codable, Equatable, Hashable, Sendable {
     /// The current portable document format version.
     static let currentFormatVersion = 1
 
@@ -21,6 +21,8 @@ struct GenerationTask: Codable, Equatable, Sendable {
     var negativePrompt: String
     /// The selected starting image for image-to-video tasks.
     var sourceImageURL: URL?
+    /// The user-selected destination for the generated video.
+    var outputURL: URL?
     /// The requested output width in pixels.
     var width: Int
     /// The requested output height in pixels.

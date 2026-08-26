@@ -21,6 +21,7 @@ struct AppView: View {
         }
         .task {
             await appModel.refreshSystemStatus()
+            await appModel.loadLibraries()
         }
     }
 
@@ -33,17 +34,9 @@ struct AppView: View {
         case .systemStatus:
             SystemStatusView()
         case .savedTasks:
-            PlaceholderView(
-                title: "Saved Tasks",
-                systemImage: "doc.on.doc",
-                description: "Portable task documents and recent tasks will appear here."
-            )
+            SavedTasksView()
         case .generatedVideos:
-            PlaceholderView(
-                title: "Generated Videos",
-                systemImage: "play.rectangle.on.rectangle",
-                description: "Completed local generations will appear here."
-            )
+            GeneratedVideosView()
         case .models:
             ModelsView()
         case nil:

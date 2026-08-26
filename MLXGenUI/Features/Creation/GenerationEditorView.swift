@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -11,6 +12,8 @@ struct GenerationEditorView: View {
     @State private var showsAdvancedSettings = false
     /// Controls confirmation before a potentially long generation begins.
     @State private var isConfirmingGeneration = false
+    /// Controls export of the current portable task document.
+    @State private var isExportingTask = false
 
     /// The generation editor hierarchy.
     var body: some View {
@@ -34,6 +37,23 @@ struct GenerationEditorView: View {
             allowsMultipleSelection: false,
             onCompletion: selectImage
         )
+        .fileExporter(
+            isPresented: $isExportingTask,
+            document: GenerationTaskDocument(task: appModel.task),
+            contentType: .mlxGenTask,
+            defaultFilename: appModel.task.name
+        ) { result in
+            if case .success = result {
+                Task(name: "Save exported task to library") {
+                    await appModel.saveCurrentTask()
+                }
+            }
+        }
+        .toolbar {
+            Button("Save Task", systemImage: "square.and.arrow.down") {
+                isExportingTask = true
+            }
+        }
     }
 
     /// Controls for selecting a curated task preset.
@@ -103,6 +123,15 @@ struct GenerationEditorView: View {
             Stepper("Frames: \(task.wrappedValue.frameCount)", value: task.frameCount, in: 1...121)
             Stepper("Frame rate: \(task.wrappedValue.framesPerSecond) fps", value: task.framesPerSecond, in: 1...60)
             LabeledContent("Approximate duration", value: task.wrappedValue.duration.formatted(.units(allowed: [.seconds], width: .wide)))
+            LabeledContent("Output") {
+                HStack {
+                    Text(task.wrappedValue.outputURL?.path ?? "Movies folder (automatic name)")
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(task.wrappedValue.outputURL == nil ? .secondary : .primary)
+                    Button("Choose…", action: chooseOutputURL)
+                }
+            }
         }
     }
 
@@ -179,10 +208,12 @@ struct GenerationEditorView: View {
     private var commandPreview: String {
         do {
             let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
+            let outputURL = appModel.task.outputURL
+                ?? homeDirectory.appending(path: "Movies/automatic-output-name.mp4")
             return try GenerationCommandBuilder().makeCommand(
                 for: appModel.task,
                 executableURL: homeDirectory.appending(path: ".local/bin/mlxgen"),
-                outputURL: homeDirectory.appending(path: "Movies/output.mp4")
+                outputURL: outputURL
             ).displayString
         } catch {
             return "Complete the required fields to preview the command."
@@ -193,5 +224,17 @@ struct GenerationEditorView: View {
     private func selectImage(_ result: Result<[URL], any Error>) {
         guard case .success(let URLs) = result, let URL = URLs.first else { return }
         appModel.task.sourceImageURL = URL
+    }
+
+    /// Presents the native macOS save panel for the generated MP4 destination.
+    private func chooseOutputURL() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.mpeg4Movie]
+        panel.canCreateDirectories = true
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Movies")
+        panel.nameFieldStringValue = "mlxgen-\(appModel.task.identifier.uuidString.prefix(8)).mp4"
+        if panel.runModal() == .OK, let URL = panel.url {
+            appModel.setOutputURL(URL)
+        }
     }
 }

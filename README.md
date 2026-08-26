@@ -10,7 +10,10 @@ The project is in active development. The current foundation provides:
 - Validation and a copyable `mlxgen` command preview.
 - Confirmed installation and update actions using Homebrew and `uv` directly.
 - A curated Wan model catalog with explicit downloads.
+- Installed-model detection and remote revision checks with Download or Update actions only when needed.
 - Cancellable generation with structured MLX-Gen progress and bounded diagnostics.
+- Portable `.mlxgentask` documents and a persistent saved-task library.
+- User-selected MP4 output destinations and generated-video history with AVKit playback.
 
 ## Requirements
 
