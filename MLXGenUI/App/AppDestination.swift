@@ -4,6 +4,8 @@ import Foundation
 enum AppDestination: String, CaseIterable, Hashable, Identifiable {
     /// The task editor for creating a video.
     case createVideo
+    /// Snapshots of every confirmed generation attempt.
+    case history
     /// Previously saved generation tasks.
     case savedTasks
     /// Videos generated through the app.
@@ -20,6 +22,7 @@ enum AppDestination: String, CaseIterable, Hashable, Identifiable {
     var title: String {
         switch self {
         case .createVideo: "Create Video"
+        case .history: "History"
         case .savedTasks: "Saved Tasks"
         case .generatedVideos: "Generated Videos"
         case .models: "Models"
@@ -31,6 +34,7 @@ enum AppDestination: String, CaseIterable, Hashable, Identifiable {
     var systemImage: String {
         switch self {
         case .createVideo: "film.stack"
+        case .history: "clock.arrow.circlepath"
         case .savedTasks: "doc.on.doc"
         case .generatedVideos: "play.rectangle.on.rectangle"
         case .models: "shippingbox"

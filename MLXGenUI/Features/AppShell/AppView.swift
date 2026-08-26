@@ -31,6 +31,8 @@ struct AppView: View {
         switch destination {
         case .createVideo:
             GenerationEditorView()
+        case .history:
+            GenerationHistoryView()
         case .systemStatus:
             SystemStatusView()
         case .savedTasks:

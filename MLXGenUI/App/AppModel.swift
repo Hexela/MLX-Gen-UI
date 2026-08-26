@@ -37,6 +37,9 @@ final class AppModel {
     /// Tasks retained in the app's local library.
     private(set) var savedTasks: [SavedTaskRecord] = []
 
+    /// Immutable settings snapshots for confirmed generation attempts.
+    private(set) var generationHistory: [GenerationHistoryRecord] = []
+
     /// Successfully generated local video artifacts.
     private(set) var generatedVideos: [GeneratedVideoRecord] = []
 
@@ -123,12 +126,14 @@ final class AppModel {
         modelStatuses = await modelService.statuses(for: WanModel.catalog)
     }
 
-    /// Loads saved tasks and generated-video history from Application Support.
+    /// Loads saved tasks, generation attempts, and generated videos from Application Support.
     func loadLibraries() async {
         do {
             async let tasks = libraryStore.loadTasks()
+            async let history = libraryStore.loadGenerationHistory()
             async let videos = libraryStore.loadVideos()
             savedTasks = try await tasks
+            generationHistory = try await history
             generatedVideos = try await videos
             libraryError = nil
         } catch {
@@ -154,6 +159,16 @@ final class AppModel {
         selection = .createVideo
     }
 
+    /// Restores every user option from an earlier attempt as a new editable task.
+    ///
+    /// - Parameter record: The immutable attempt snapshot to reuse.
+    func restore(_ record: GenerationHistoryRecord) {
+        var restoredTask = record.task
+        restoredTask.identifier = UUID()
+        task = restoredTask
+        selection = .createVideo
+    }
+
     /// Replaces the editor with a task imported from a portable document.
     ///
     /// - Parameter document: The decoded portable task document.
@@ -176,6 +191,8 @@ final class AppModel {
             backendOperationError = issues.map(\.message).joined(separator: " ")
             return
         }
+
+        await recordGenerationAttempt()
 
         do {
             let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
@@ -220,6 +237,19 @@ final class AppModel {
             }
         } catch {
             backendOperationError = error.localizedDescription
+        }
+    }
+
+    /// Persists an immutable snapshot before the backend starts so failed attempts remain reusable.
+    private func recordGenerationAttempt() async {
+        let record = GenerationHistoryRecord(id: UUID(), task: task, attemptedAt: .now)
+        generationHistory.insert(record, at: 0)
+
+        do {
+            generationHistory = try await libraryStore.add(record, to: generationHistory)
+            libraryError = nil
+        } catch {
+            libraryError = error.localizedDescription
         }
     }
 

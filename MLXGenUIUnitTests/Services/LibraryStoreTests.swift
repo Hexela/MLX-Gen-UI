@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MLXGenUI
 
-/// Verifies persistent task and generated-video libraries.
+/// Verifies persistent task, generation-attempt, and generated-video libraries.
 struct LibraryStoreTests {
     /// Saving the same task identity should replace rather than duplicate it.
     @Test func taskSaveReplacesExistingRecord() async throws {
@@ -39,5 +39,32 @@ struct LibraryStoreTests {
         let loaded = try await store.loadVideos()
 
         #expect(loaded == [record])
+    }
+
+    /// Every generation attempt should retain all submitted task options independently.
+    @Test func generationHistoryRetainsEachAttempt() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let store = LibraryStore(directoryURL: directoryURL)
+        var firstTask = GenerationPreset.animateImage.makeTask()
+        firstTask.prompt = "First motion"
+        firstTask.sourceImageURL = URL(filePath: "/tmp/source image.png")
+        var secondTask = firstTask
+        secondTask.prompt = "Second motion"
+        secondTask.guidance = 6
+        let firstRecord = GenerationHistoryRecord(id: UUID(), task: firstTask, attemptedAt: .now)
+        let secondRecord = GenerationHistoryRecord(
+            id: UUID(),
+            task: secondTask,
+            attemptedAt: firstRecord.attemptedAt.addingTimeInterval(1)
+        )
+
+        var records = try await store.add(firstRecord, to: [])
+        records = try await store.add(secondRecord, to: records)
+        let loaded = try await store.loadGenerationHistory()
+
+        #expect(loaded == [secondRecord, firstRecord])
+        #expect(loaded.last?.task.sourceImageURL == firstTask.sourceImageURL)
+        #expect(loaded.first?.task.guidance == 6)
     }
 }

@@ -17,7 +17,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A00000000000000000000001 /* MLXGenUI.app */ = {isa = PBXFileReference; lastKnownFileType = wrapper.application; path = MLXGenUI.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000001 /* MLXGenUI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = MLXGenUI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000002 /* MLXGenUIUnitTests.xctest */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; path = MLXGenUIUnitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -220,13 +220,16 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DY9P4K9PWF;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ProjectConfiguration/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "MLX Gen UI";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.MLXGenUI;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hexela.MLXGenUI;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -243,11 +246,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = DY9P4K9PWF;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ProjectConfiguration/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "MLX Gen UI";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.MLXGenUI;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hexela.MLXGenUI;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;

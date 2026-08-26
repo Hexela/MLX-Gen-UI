@@ -1,6 +1,6 @@
 import Foundation
 
-/// Persists saved tasks and generated-video history in Application Support.
+/// Persists saved tasks, generation attempts, and generated-video history in Application Support.
 actor LibraryStore {
     /// The filesystem used to read and write library data.
     private let fileManager: FileManager
@@ -39,6 +39,32 @@ actor LibraryStore {
         updated.append(SavedTaskRecord(task: task, savedAt: .now))
         updated.sort { $0.savedAt > $1.savedAt }
         try persist(updated, to: directoryURL.appending(path: "SavedTasks.json"))
+        return updated
+    }
+
+    /// Loads confirmed generation attempts, returning an empty history when no file exists.
+    func loadGenerationHistory() throws -> [GenerationHistoryRecord] {
+        try load(
+            [GenerationHistoryRecord].self,
+            from: directoryURL.appending(path: "GenerationHistory.json"),
+            default: []
+        )
+    }
+
+    /// Adds and persists an immutable generation-attempt snapshot.
+    ///
+    /// - Parameters:
+    ///   - record: The attempt to retain.
+    ///   - records: The caller's current history snapshot.
+    /// - Returns: The updated history sorted newest first.
+    func add(
+        _ record: GenerationHistoryRecord,
+        to records: [GenerationHistoryRecord]
+    ) throws -> [GenerationHistoryRecord] {
+        var updated = records.filter { $0.id != record.id }
+        updated.append(record)
+        updated.sort { $0.attemptedAt > $1.attemptedAt }
+        try persist(updated, to: directoryURL.appending(path: "GenerationHistory.json"))
         return updated
     }
 
