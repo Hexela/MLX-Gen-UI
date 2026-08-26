@@ -50,7 +50,6 @@ The app detects these components and will provide guided setup as installation s
 4. If Xcode requests a development team, choose your personal team under Signing & Capabilities.
 5. Press Command-R.
 
-The checked-in Xcode project is the source of truth. No project generator, package manager, or third-party Swift dependency is required.
 
 You can also build from Terminal:
 
@@ -64,11 +63,6 @@ Run unit tests with:
 xcodebuild -project MLXGenUI.xcodeproj -scheme MLXGenUI -destination 'platform=macOS' test
 ```
 
-## Documentation
-
-Developer documentation is written using DocC. In Xcode, choose **Product > Build Documentation**. The catalog covers architecture, backend integration, and the conventions contributors must preserve.
-
-Documentation is part of the definition of done. Changes to behavior or APIs must update their symbol comments and any affected DocC articles in the same pull request.
 
 ## Privacy
 
@@ -78,6 +72,3 @@ Generation runs locally. The app does not upload prompts or media. MLX-Gen model
 
 Contributions are welcome. Please keep changes focused, add Swift Testing coverage for domain logic, and build both the app and DocC documentation before opening a pull request. Public and architectural APIs must have current DocC comments.
 
-## License
-
-A project license will be selected before the first public release. Until then, the source is provided for development and evaluation only.
