@@ -55,6 +55,9 @@ final class AppModel {
     /// The store that persists tasks and generated-video history.
     private let libraryStore: LibraryStore
 
+    /// Persists intermediate state for multi-segment generations.
+    private let longVideoRunStore = LongVideoRunStore()
+
     /// Creates an application model with injectable service dependencies.
     ///
     /// - Parameters:
@@ -181,12 +184,30 @@ final class AppModel {
                 .appending(
                     path: "mlxgen-\(task.identifier.uuidString.prefix(8))-\(UUID().uuidString.prefix(8)).mp4"
                 )
-            let command = try GenerationCommandBuilder().makeCommand(
-                for: task,
-                executableURL: homeDirectory.appending(path: ".local/bin/mlxgen"),
-                outputURL: outputURL
-            )
-            let completed = await run(command, title: "Generating \(task.name)")
+            guard let model = WanModel.model(withIdentifier: task.modelIdentifier) else {
+                throw LongVideoGenerationError.unknownModel
+            }
+            let plan = LongVideoPlanner().makePlan(for: task, model: model)
+            let needsPostProcessing = plan.requiresAssembly
+                || plan.segments[0].frameCount != plan.targetFrameCount
+            let completed: Bool
+            if needsPostProcessing {
+                completed = try await generateLongVideo(
+                    plan: plan,
+                    outputURL: outputURL,
+                    executableURL: homeDirectory.appending(path: ".local/bin/mlxgen")
+                )
+            } else {
+                var oneShotTask = task
+                oneShotTask.frameCount = plan.segments[0].frameCount
+                oneShotTask.targetDurationSeconds = nil
+                let command = try GenerationCommandBuilder().makeCommand(
+                    for: oneShotTask,
+                    executableURL: homeDirectory.appending(path: ".local/bin/mlxgen"),
+                    outputURL: outputURL
+                )
+                completed = await run(command, title: "Generating \(task.name)")
+            }
             if completed {
                 let record = GeneratedVideoRecord(
                     id: UUID(),
@@ -199,6 +220,109 @@ final class AppModel {
             }
         } catch {
             backendOperationError = error.localizedDescription
+        }
+    }
+
+    /// Generates every planned segment, prepares handovers, and assembles the final MP4.
+    private func generateLongVideo(
+        plan: LongVideoPlan,
+        outputURL: URL,
+        executableURL: URL
+    ) async throws -> Bool {
+        let runIdentifier = UUID()
+        let workspaceURL = try await longVideoRunStore.createWorkspace(for: runIdentifier)
+        var manifest = LongVideoRun(
+            identifier: runIdentifier,
+            task: task,
+            plan: plan,
+            outputURL: outputURL,
+            completedSegmentIndices: [],
+            status: .generating
+        )
+        try await longVideoRunStore.save(manifest, in: workspaceURL)
+        let activity = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiated, .idleSystemSleepDisabled],
+            reason: "Generating a multi-segment MLX-Gen video"
+        )
+        defer { ProcessInfo.processInfo.endActivity(activity) }
+
+        do {
+            var segmentURLs: [URL] = []
+            var handoverURLs: [URL] = []
+            for segment in plan.segments {
+                try Task.checkCancellation()
+                var segmentTask = task
+                segmentTask.frameCount = segment.frameCount
+                segmentTask.targetDurationSeconds = nil
+                segmentTask.outputURL = nil
+                if segment.index > 0 {
+                    guard let firstFrameURL = handoverURLs.first else {
+                        throw LongVideoGenerationError.missingHandoverFrames
+                    }
+                    segmentTask.workflow = .imageToVideo
+                    segmentTask.sourceImageURL = firstFrameURL
+                    if let continuationModelIdentifier = plan.continuationModelIdentifier {
+                        segmentTask.modelIdentifier = continuationModelIdentifier
+                    }
+                    if let seed = task.seed {
+                        segmentTask.seed = seed &+ segment.index
+                    }
+                }
+                let segmentURL = workspaceURL.appending(path: "segment-\(segment.index).mp4")
+                let command = try GenerationCommandBuilder().makeCommand(
+                    for: segmentTask,
+                    executableURL: executableURL,
+                    outputURL: segmentURL,
+                    contextFrameURLs: Array(handoverURLs.dropFirst())
+                )
+                guard await run(
+                    command,
+                    title: "Generating segment \(segment.index + 1) of \(plan.segments.count)"
+                ) else {
+                    manifest.status = .interrupted
+                    try await longVideoRunStore.save(manifest, in: workspaceURL)
+                    return false
+                }
+                segmentURLs.append(segmentURL)
+                manifest.completedSegmentIndices.append(segment.index)
+                try await longVideoRunStore.save(manifest, in: workspaceURL)
+
+                if segment.index + 1 < plan.segments.count {
+                    backendOperation = BackendOperationState(title: "Preparing continuation frames")
+                    let nextOverlap = plan.segments[segment.index + 1].overlapFrameCount
+                    handoverURLs = try await ContinuationFrameExtractor().extractLastFrames(
+                        count: nextOverlap,
+                        framesPerSecond: plan.framesPerSecond,
+                        from: segmentURL,
+                        into: workspaceURL.appending(path: "handover-\(segment.index)")
+                    )
+                    backendOperation?.message = "Continuation frames ready"
+                    backendOperation?.isComplete = true
+                    backendOperation?.isRunning = false
+                }
+            }
+
+            manifest.status = .assembling
+            try await longVideoRunStore.save(manifest, in: workspaceURL)
+            backendOperation = BackendOperationState(title: "Joining generated segments")
+            let assembledURL = workspaceURL.appending(path: "assembled.mp4")
+            try await VideoConcatenator().concatenate(segmentURLs: segmentURLs, using: plan, to: assembledURL)
+            if FileManager.default.fileExists(atPath: outputURL.path) {
+                _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: assembledURL)
+            } else {
+                try FileManager.default.moveItem(at: assembledURL, to: outputURL)
+            }
+            manifest.status = .completed
+            try await longVideoRunStore.save(manifest, in: workspaceURL)
+            backendOperation?.message = "Complete"
+            backendOperation?.progressFraction = 1
+            backendOperation?.isComplete = true
+            backendOperation?.isRunning = false
+            return true
+        } catch {
+            manifest.status = .interrupted
+            try? await longVideoRunStore.save(manifest, in: workspaceURL)
+            throw error
         }
     }
 
@@ -249,6 +373,22 @@ final class AppModel {
             backendOperation?.progressFraction = 1
             backendOperation?.isComplete = true
             backendOperation?.isRunning = false
+        }
+    }
+}
+
+/// Failures specific to automated multi-segment generation.
+enum LongVideoGenerationError: LocalizedError {
+    /// The selected repository is not in the curated model catalogue.
+    case unknownModel
+    /// A continuation was attempted without an extracted image window.
+    case missingHandoverFrames
+
+    /// A localized explanation suitable for presentation to the user.
+    var errorDescription: String? {
+        switch self {
+        case .unknownModel: "The selected model does not include long-video capability information."
+        case .missingHandoverFrames: "The app could not prepare the next video segment."
         }
     }
 }

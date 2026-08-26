@@ -15,6 +15,15 @@ The project is in active development. The current foundation provides:
 - Portable `.mlxgentask` documents and a persistent saved-task library.
 - User-selected MP4 output destinations and generated-video history with AVKit playback.
 - Workflow-aware model selection using the curated Wan catalog and local installation state.
+- Exact-duration video requests with automatic Wan continuation segments.
+- Multi-frame motion handovers, native AVFoundation assembly, and overlap-aware trimming.
+- Persistent run manifests and idle-sleep prevention for long unattended generations.
+
+## Longer videos
+
+Enter the desired finished duration on the Create Video screen. When the request exceeds the selected Wan model's recommended shot length, MLXGenUI automatically generates the required segments sequentially, extracts an ordered handover window, and joins the results into one MP4. Text-to-video jobs using Wan A14B require the paired A14B image-to-video model for continuation; the Ready Check identifies that requirement before generation starts.
+
+Intermediate files and a machine-readable run manifest are retained under Application Support if a generation is cancelled or interrupted. The final output is moved to the selected destination only after assembly succeeds.
 
 ## Requirements
 

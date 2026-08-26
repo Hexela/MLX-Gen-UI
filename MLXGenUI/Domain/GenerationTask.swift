@@ -29,6 +29,8 @@ struct GenerationTask: Codable, Equatable, Hashable, Sendable {
     var height: Int
     /// The number of frames to generate.
     var frameCount: Int
+    /// The requested finished duration in seconds, or `nil` to use `frameCount` directly.
+    var targetDurationSeconds: Double?
     /// The output playback rate in frames per second.
     var framesPerSecond: Int
     /// The number of denoising steps.
@@ -48,6 +50,12 @@ struct GenerationTask: Codable, Equatable, Hashable, Sendable {
 
     /// The nominal playback duration requested by the task.
     var duration: Duration {
-        .seconds(Double(frameCount) / Double(framesPerSecond))
+        .seconds(targetDurationSeconds ?? Double(frameCount) / Double(framesPerSecond))
+    }
+
+    /// The number of frames required in the finished, assembled video.
+    var targetFrameCount: Int {
+        guard let targetDurationSeconds else { return frameCount }
+        return max(Int(ceil(targetDurationSeconds * Double(framesPerSecond))), 1)
     }
 }

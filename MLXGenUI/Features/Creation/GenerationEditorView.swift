@@ -81,7 +81,12 @@ struct GenerationEditorView: View {
 
     /// Controls that select a backend route and optional starting image.
     private func workflowSection(task: Binding<GenerationTask>) -> some View {
-        Section("Workflow") {
+        let availableModels = WanModel.available(for: task.wrappedValue.workflow)
+        let hasValidModelSelection = availableModels.contains {
+            $0.id == task.wrappedValue.modelIdentifier
+        }
+
+        return Section("Workflow") {
             Picker("Create from", selection: task.workflow) {
                 ForEach(GenerationWorkflow.allCases) { workflow in
                     Text(workflow.title).tag(workflow)
@@ -92,16 +97,24 @@ struct GenerationEditorView: View {
                 selectCompatibleModel(for: workflow)
             }
 
-            Picker("Model", selection: task.modelIdentifier) {
-                ForEach(WanModel.available(for: task.wrappedValue.workflow)) { model in
-                    Label(
-                        model.name,
-                        systemImage: (appModel.modelStatuses[model.id] ?? .checking).systemImage
-                    )
-                    .tag(model.id)
+            if hasValidModelSelection {
+                Picker("Model", selection: task.modelIdentifier) {
+                    ForEach(availableModels) { model in
+                        Label(
+                            model.name,
+                            systemImage: (appModel.modelStatuses[model.id] ?? .checking).systemImage
+                        )
+                        .tag(model.id)
+                    }
                 }
+                .accessibilityHint("Selects the Wan model used for this generation")
+            } else {
+                LabeledContent("Model", value: "Selecting a compatible model…")
+                    .foregroundStyle(.secondary)
+                    .task(id: task.wrappedValue.workflow) {
+                        selectCompatibleModel(for: task.wrappedValue.workflow)
+                    }
             }
-            .accessibilityHint("Selects the Wan model used for this generation")
 
             if let model = WanModel.model(withIdentifier: task.wrappedValue.modelIdentifier) {
                 Text(model.summary)
@@ -147,9 +160,25 @@ struct GenerationEditorView: View {
                 TextField("Height", value: task.height, format: .number)
             }
             LabeledContent("Canvas", value: "\(task.wrappedValue.width) × \(task.wrappedValue.height) pixels")
-            Stepper("Frames: \(task.wrappedValue.frameCount)", value: task.frameCount, in: 1...121)
             Stepper("Frame rate: \(task.wrappedValue.framesPerSecond) fps", value: task.framesPerSecond, in: 1...60)
-            LabeledContent("Approximate duration", value: task.wrappedValue.duration.formatted(.units(allowed: [.seconds], width: .wide)))
+            TextField(
+                "Desired duration (seconds)",
+                value: targetDurationBinding,
+                format: .number.precision(.fractionLength(0...2))
+            )
+            .accessibilityHint("Sets the exact duration of the finished, automatically assembled video")
+            if let plan = longVideoPlan {
+                LabeledContent(
+                    "Generation plan",
+                    value: plan.segments.count == 1
+                        ? "1 segment"
+                        : "\(plan.segments.count) segments with automatic handovers"
+                )
+                if plan.requiresAssembly {
+                    Text("The app will generate each segment in order, prepare continuation frames, and join them into one video.")
+                        .foregroundStyle(.secondary)
+                }
+            }
             LabeledContent("Output") {
                 HStack {
                     Text(task.wrappedValue.outputURL?.path ?? "Movies folder (automatic name)")
@@ -189,6 +218,15 @@ struct GenerationEditorView: View {
                 }
             }
 
+            if let continuationModel = requiredContinuationModel,
+               requiredContinuationModelStatus.isInstalled == false {
+                Label(
+                    "Download \(continuationModel.name) before creating this longer video.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .foregroundStyle(.orange)
+            }
+
             Text(commandPreview)
                 .font(.system(.callout, design: .monospaced))
                 .textSelection(.enabled)
@@ -207,6 +245,7 @@ struct GenerationEditorView: View {
                 GenerationTaskValidator().issues(in: appModel.task).isEmpty == false
                     || appModel.systemStatus.isReady == false
                     || selectedModelStatus.isInstalled == false
+                    || requiredContinuationModelStatus.isInstalled == false
                     || appModel.backendOperation?.isRunning == true
             )
             .confirmationDialog(
@@ -232,12 +271,51 @@ struct GenerationEditorView: View {
                 Text("Download the selected model from Models before generating.")
                     .foregroundStyle(.secondary)
             }
+            if let continuationModel = requiredContinuationModel,
+               requiredContinuationModelStatus.isInstalled == false {
+                Text("This longer video also needs \(continuationModel.name) for its continuation segments.")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
     /// The current local installation state of the selected model.
     private var selectedModelStatus: ModelInstallationStatus {
         appModel.modelStatuses[appModel.task.modelIdentifier] ?? .checking
+    }
+
+    /// The calculated segment plan for the editor's current values.
+    private var longVideoPlan: LongVideoPlan? {
+        guard let model = WanModel.model(withIdentifier: appModel.task.modelIdentifier) else { return nil }
+        return LongVideoPlanner().makePlan(for: appModel.task, model: model)
+    }
+
+    /// The additional image-to-video model needed for a multi-segment text video.
+    private var requiredContinuationModel: WanModel? {
+        guard let plan = longVideoPlan,
+              plan.requiresAssembly,
+              let identifier = plan.continuationModelIdentifier,
+              identifier != appModel.task.modelIdentifier else {
+            return nil
+        }
+        return WanModel.model(withIdentifier: identifier)
+    }
+
+    /// Installation state of the paired continuation model, or installed when none is needed.
+    private var requiredContinuationModelStatus: ModelInstallationStatus {
+        guard let model = requiredContinuationModel else { return .installed(localRevision: nil) }
+        return appModel.modelStatuses[model.id] ?? .checking
+    }
+
+    /// A nonoptional editor binding backed by the task's portable optional duration field.
+    private var targetDurationBinding: Binding<Double> {
+        Binding(
+            get: {
+                appModel.task.targetDurationSeconds
+                    ?? Double(appModel.task.frameCount) / Double(appModel.task.framesPerSecond)
+            },
+            set: { appModel.task.targetDurationSeconds = $0 }
+        )
     }
 
     /// A display-only command for the current task or its validation error.

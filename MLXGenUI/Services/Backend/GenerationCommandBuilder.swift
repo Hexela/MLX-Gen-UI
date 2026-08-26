@@ -16,7 +16,8 @@ struct GenerationCommandBuilder: Sendable {
     func makeCommand(
         for task: GenerationTask,
         executableURL: URL,
-        outputURL: URL
+        outputURL: URL,
+        contextFrameURLs: [URL] = []
     ) throws -> GenerationCommand {
         let issues = validator.issues(in: task)
         guard issues.isEmpty else {
@@ -41,6 +42,10 @@ struct GenerationCommandBuilder: Sendable {
         }
         if let sourceImageURL = task.sourceImageURL {
             arguments += ["--image", sourceImageURL.path]
+        }
+        if contextFrameURLs.isEmpty == false {
+            arguments.append("--context-frames")
+            arguments.append(contentsOf: contextFrameURLs.map(\.path))
         }
         if let flowShift = task.flowShift {
             arguments += ["--flow-shift", String(flowShift)]

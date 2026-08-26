@@ -41,6 +41,9 @@ struct GenerationTaskValidator: Sendable {
         if task.frameCount <= 0 || task.framesPerSecond <= 0 {
             issues.append(.init(id: "timing", kind: .invalidValue, message: "Frames and frame rate must be positive."))
         }
+        if let duration = task.targetDurationSeconds, duration <= 0 {
+            issues.append(.init(id: "duration", kind: .invalidValue, message: "Duration must be positive."))
+        }
         if task.stepCount <= 0 {
             issues.append(.init(id: "steps", kind: .invalidValue, message: "Denoising steps must be positive."))
         }
