@@ -54,6 +54,10 @@ struct GenerationEditorView: View {
                 isExportingTask = true
             }
         }
+        .task {
+            selectCompatibleModel(for: appModel.task.workflow)
+            await appModel.refreshModelStatuses()
+        }
     }
 
     /// Controls for selecting a curated task preset.
@@ -84,6 +88,29 @@ struct GenerationEditorView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .onChange(of: task.wrappedValue.workflow) { _, workflow in
+                selectCompatibleModel(for: workflow)
+            }
+
+            Picker("Model", selection: task.modelIdentifier) {
+                ForEach(WanModel.available(for: task.wrappedValue.workflow)) { model in
+                    Label(
+                        model.name,
+                        systemImage: (appModel.modelStatuses[model.id] ?? .checking).systemImage
+                    )
+                    .tag(model.id)
+                }
+            }
+            .accessibilityHint("Selects the Wan model used for this generation")
+
+            if let model = WanModel.model(withIdentifier: task.wrappedValue.modelIdentifier) {
+                Text(model.summary)
+                    .foregroundStyle(.secondary)
+                LabeledContent(
+                    "Model status",
+                    value: (appModel.modelStatuses[model.id] ?? .checking).title
+                )
+            }
 
             if task.wrappedValue.workflow == .imageToVideo {
                 LabeledContent("Starting image") {
@@ -139,7 +166,6 @@ struct GenerationEditorView: View {
     private func advancedSection(task: Binding<GenerationTask>) -> some View {
         Section {
             DisclosureGroup("Advanced Settings", isExpanded: $showsAdvancedSettings) {
-                TextField("Model", text: task.modelIdentifier)
                 Stepper("Denoising steps: \(task.wrappedValue.stepCount)", value: task.stepCount, in: 1...100)
                 TextField("Guidance", value: task.guidance, format: .number.precision(.fractionLength(0...2)))
                 TextField("Secondary guidance", value: task.secondaryGuidance, format: .number.precision(.fractionLength(0...2)))
@@ -180,6 +206,7 @@ struct GenerationEditorView: View {
             .disabled(
                 GenerationTaskValidator().issues(in: appModel.task).isEmpty == false
                     || appModel.systemStatus.isReady == false
+                    || selectedModelStatus.isInstalled == false
                     || appModel.backendOperation?.isRunning == true
             )
             .confirmationDialog(
@@ -201,7 +228,16 @@ struct GenerationEditorView: View {
                 Text("Complete backend setup in System Status before generating.")
                     .foregroundStyle(.secondary)
             }
+            if selectedModelStatus == .notInstalled {
+                Text("Download the selected model from Models before generating.")
+                    .foregroundStyle(.secondary)
+            }
         }
+    }
+
+    /// The current local installation state of the selected model.
+    private var selectedModelStatus: ModelInstallationStatus {
+        appModel.modelStatuses[appModel.task.modelIdentifier] ?? .checking
     }
 
     /// A display-only command for the current task or its validation error.
@@ -236,5 +272,17 @@ struct GenerationEditorView: View {
         if panel.runModal() == .OK, let URL = panel.url {
             appModel.setOutputURL(URL)
         }
+    }
+
+    /// Selects the preferred curated model when the current model cannot run a workflow.
+    ///
+    /// - Parameter workflow: The newly selected generation workflow.
+    private func selectCompatibleModel(for workflow: GenerationWorkflow) {
+        let availableModels = WanModel.available(for: workflow)
+        guard availableModels.contains(where: { $0.id == appModel.task.modelIdentifier }) == false,
+              let preferredModel = availableModels.first else {
+            return
+        }
+        appModel.task.modelIdentifier = preferredModel.id
     }
 }

@@ -223,8 +223,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_TESTABILITY = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ProjectConfiguration/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.MLXGenUI;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -244,8 +244,8 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ProjectConfiguration/Info.plist;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.MLXGenUI;
 				PRODUCT_NAME = "$(TARGET_NAME)";

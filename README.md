@@ -14,6 +14,7 @@ The project is in active development. The current foundation provides:
 - Cancellable generation with structured MLX-Gen progress and bounded diagnostics.
 - Portable `.mlxgentask` documents and a persistent saved-task library.
 - User-selected MP4 output destinations and generated-video history with AVKit playback.
+- Workflow-aware model selection using the curated Wan catalog and local installation state.
 
 ## Requirements
 

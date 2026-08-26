@@ -43,4 +43,12 @@ enum ModelInstallationStatus: Equatable, Sendable {
         case .updateAvailable: "arrow.down.circle.fill"
         }
     }
+
+    /// `true` when a complete local snapshot can be used for generation.
+    var isInstalled: Bool {
+        switch self {
+        case .installed, .current, .updateAvailable: true
+        case .checking, .notInstalled: false
+        }
+    }
 }

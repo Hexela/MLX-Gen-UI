@@ -1,7 +1,7 @@
 import Foundation
 
 /// A curated Wan model that MLXGenUI can download and use.
-struct WanModel: Identifiable, Equatable, Sendable {
+struct WanModel: Identifiable, Equatable, Hashable, Sendable {
     /// The repository identifier passed to MLX-Gen.
     let id: String
     /// A concise user-facing model name.
@@ -37,4 +37,20 @@ struct WanModel: Identifiable, Equatable, Sendable {
             summary: "A smaller package that supports both text and starting-image workflows."
         )
     ]
+
+    /// Returns curated models that support a workflow.
+    ///
+    /// - Parameter workflow: The generation workflow to support.
+    /// - Returns: Models in their preferred display order.
+    static func available(for workflow: GenerationWorkflow) -> [WanModel] {
+        catalog.filter { $0.workflows.contains(workflow) }
+    }
+
+    /// Finds a curated model by its repository identifier.
+    ///
+    /// - Parameter identifier: The repository identifier to find.
+    /// - Returns: The matching model, or `nil` when it is not in the curated catalog.
+    static func model(withIdentifier identifier: String) -> WanModel? {
+        catalog.first { $0.id == identifier }
+    }
 }

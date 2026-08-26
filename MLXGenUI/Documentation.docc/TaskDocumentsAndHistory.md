@@ -8,6 +8,8 @@ Preserve generation inputs and completed local artifacts without hiding their lo
 
 Task documents store source and output URLs as references to locations on the current Mac. When a document moves between Macs, the user may need to choose those files again.
 
+The application exports `com.example.mlxgenui.task` in its Info.plist and associates the `.mlxgentask` extension with that type. Keep the Info.plist declaration and the `UTType.mlxGenTask` identifier identical when changing document metadata.
+
 ## Output destinations
 
 The editor uses the native macOS save panel to choose an MP4 destination. If no destination is selected, the app creates a stable task-derived filename in the user's Movies directory.
