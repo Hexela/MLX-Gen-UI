@@ -17,6 +17,9 @@ struct GenerationEditorView: View {
     /// Pixel information read from the selected starting image.
     @State private var sourceImageDetails: SourceImageDetails?
 
+    /// Whether the editor exposes a user-supplied seed rather than choosing one automatically.
+    @State private var usesFixedSeed = false
+
     /// The generation editor hierarchy.
     var body: some View {
         @Bindable var appModel = appModel
@@ -57,12 +60,16 @@ struct GenerationEditorView: View {
             }
         }
         .task {
+            usesFixedSeed = appModel.task.seed != nil
             selectCompatibleModel(for: appModel.task.workflow)
             refreshSourceImageDetails()
             await appModel.refreshModelStatuses()
         }
         .onChange(of: appModel.task.sourceImageURL) {
             refreshSourceImageDetails()
+        }
+        .onChange(of: appModel.task.identifier) {
+            usesFixedSeed = appModel.task.seed != nil
         }
     }
 
@@ -233,7 +240,7 @@ struct GenerationEditorView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            LabeledContent("Output") {
+            LabeledContent("Output base") {
                 HStack {
                     Text(task.wrappedValue.outputURL?.path ?? "Movies folder (automatic name)")
                         .lineLimit(1)
@@ -261,6 +268,15 @@ struct GenerationEditorView: View {
                     LabeledContent("Secondary guidance", value: "Not used by this model")
                         .foregroundStyle(.secondary)
                         .help("Secondary guidance is only available for A14B models with two-transformer boundary routing. The selected 5B model uses its primary guidance value instead.")
+                }
+                Toggle("Use a fixed seed", isOn: $usesFixedSeed)
+                    .help("Use a specific seed to reproduce a single result. Multi-video batches always use unique random seeds.")
+                    .onChange(of: usesFixedSeed) { _, isEnabled in
+                        task.wrappedValue.seed = isEnabled ? (task.wrappedValue.seed ?? 0) : nil
+                    }
+                if usesFixedSeed {
+                    TextField("Seed", value: fixedSeedBinding, format: .number.grouping(.never))
+                        .help("Enter a whole number from 0 through \(GenerationTaskValidator.maximumSeed).")
                 }
                 Toggle("Use low-memory mode", isOn: task.usesLowMemoryMode)
                     .help("Reduces peak memory use, usually with a speed cost. Keep this on unless you have ample unified memory and want maximum speed.")
@@ -303,8 +319,23 @@ struct GenerationEditorView: View {
     /// Starts generation only after the user acknowledges its potential cost.
     private var generationSection: some View {
         Section {
+            Stepper(
+                "Videos to generate: \(appModel.generationCount)",
+                value: generationCountBinding,
+                in: 1...GenerationBatch.maximumCount
+            )
+            .help("Queues videos with the same settings and generates them in sequence. Each video in a batch uses a unique random seed.")
+
+            if appModel.generationCount > 1 {
+                Text("Each video will use a different random seed. The full batch runs automatically in sequence.")
+                    .foregroundStyle(.secondary)
+            }
+
             HStack(spacing: 16) {
-                Button("Generate Video", systemImage: "sparkles.rectangle.stack") {
+                Button(
+                    appModel.generationCount == 1 ? "Generate Video" : "Generate \(appModel.generationCount) Videos",
+                    systemImage: "sparkles.rectangle.stack"
+                ) {
                     isConfirmingGeneration = true
                 }
                 .buttonStyle(.borderedProminent)
@@ -332,7 +363,9 @@ struct GenerationEditorView: View {
                 }
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("Local video generation may use substantial memory and take many minutes or hours.")
+                Text(appModel.generationCount == 1
+                    ? "Local video generation may use substantial memory and take many minutes or hours."
+                    : "The videos will be generated one after another without further confirmation. Local generation may take many hours.")
             }
 
             if appModel.systemStatus.isReady == false {
@@ -390,6 +423,22 @@ struct GenerationEditorView: View {
         )
     }
 
+    /// A nonoptional binding shown only while the task has a fixed seed.
+    private var fixedSeedBinding: Binding<Int> {
+        Binding(
+            get: { appModel.task.seed ?? 0 },
+            set: { appModel.task.seed = $0 }
+        )
+    }
+
+    /// Keeps the editor's batch count within the supported queue limit.
+    private var generationCountBinding: Binding<Int> {
+        Binding(
+            get: { appModel.generationCount },
+            set: { appModel.generationCount = min(max($0, 1), GenerationBatch.maximumCount) }
+        )
+    }
+
     /// A display-only command for the current task or its validation error.
     private var commandPreview: String {
         do {
@@ -424,7 +473,7 @@ struct GenerationEditorView: View {
         panel.allowedContentTypes = [.mpeg4Movie]
         panel.canCreateDirectories = true
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Movies")
-        panel.nameFieldStringValue = "mlxgen-\(appModel.task.identifier.uuidString.prefix(8)).mp4"
+        panel.nameFieldStringValue = "mlxgen.mp4"
         if panel.runModal() == .OK, let URL = panel.url {
             appModel.setOutputURL(URL)
         }

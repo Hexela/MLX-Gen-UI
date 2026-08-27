@@ -43,6 +43,9 @@ final class AppModel {
     /// Successfully generated local video artifacts.
     private(set) var generatedVideos: [GeneratedVideoRecord] = []
 
+    /// Number of videos queued from the current editor submission.
+    var generationCount = 1
+
     /// A user-facing persistence error from the task or video library.
     private(set) var libraryError: String?
 
@@ -189,7 +192,7 @@ final class AppModel {
         task.outputURL = URL
     }
 
-    /// Starts generation using a unique output file in the user's Movies directory.
+    /// Starts one or more generations in sequence using distinct, explicit seeds.
     func generateVideo() async {
         let submittedTask = task
         let issues = GenerationTaskValidator().issues(in: submittedTask)
@@ -198,16 +201,30 @@ final class AppModel {
             return
         }
 
+        let count = min(max(generationCount, 1), GenerationBatch.maximumCount)
+        let seeds = GenerationBatch.seeds(count: count, fixedSeed: submittedTask.seed)
+        for (index, seed) in seeds.enumerated() {
+            guard Task.isCancelled == false else { return }
+            var queuedTask = submittedTask
+            queuedTask.seed = seed
+            await generateVideo(queuedTask, batchIndex: index, batchCount: seeds.count)
+        }
+    }
+
+    /// Runs and records one item from a confirmed generation batch.
+    private func generateVideo(_ submittedTask: GenerationTask, batchIndex: Int, batchCount: Int) async {
         await recordGenerationAttempt(for: submittedTask)
         let generationStartedAt = ContinuousClock.now
 
         do {
             let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-            let outputURL = submittedTask.outputURL ?? homeDirectory
-                .appending(path: "Movies")
-                .appending(
-                    path: "mlxgen-\(submittedTask.identifier.uuidString.prefix(8))-\(UUID().uuidString.prefix(8)).mp4"
-                )
+            let seed = submittedTask.seed ?? 0
+            let outputURL = GenerationBatch.outputURL(
+                baseURL: submittedTask.outputURL,
+                seed: seed,
+                createdAt: .now,
+                moviesDirectory: homeDirectory.appending(path: "Movies")
+            )
             guard let model = WanModel.model(withIdentifier: submittedTask.modelIdentifier) else {
                 throw LongVideoGenerationError.unknownModel
             }
@@ -231,7 +248,8 @@ final class AppModel {
                     executableURL: homeDirectory.appending(path: ".local/bin/mlxgen"),
                     outputURL: outputURL
                 )
-                completed = await run(command, title: "Generating \(submittedTask.name)")
+                let batchSuffix = batchCount > 1 ? " (\(batchIndex + 1) of \(batchCount))" : ""
+                completed = await run(command, title: "Generating \(submittedTask.name)\(batchSuffix)")
             }
             if completed {
                 let elapsed = generationStartedAt.duration(to: .now)

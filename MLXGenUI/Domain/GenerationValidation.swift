@@ -22,6 +22,9 @@ struct GenerationValidationIssue: Equatable, Identifiable, Sendable {
 
 /// Validates generation tasks before they reach the command-line backend.
 struct GenerationTaskValidator: Sendable {
+    /// The largest seed accepted by the generation backend.
+    static let maximumSeed = Int(UInt32.max)
+
     /// Returns every known problem with a generation task.
     ///
     /// - Parameter task: The task to validate.
@@ -46,6 +49,15 @@ struct GenerationTaskValidator: Sendable {
         }
         if task.stepCount <= 0 {
             issues.append(.init(id: "steps", kind: .invalidValue, message: "Denoising steps must be positive."))
+        }
+        if let seed = task.seed, (0...Self.maximumSeed).contains(seed) == false {
+            issues.append(
+                .init(
+                    id: "seed",
+                    kind: .invalidValue,
+                    message: "Seed must be between 0 and \(Self.maximumSeed)."
+                )
+            )
         }
 
         return issues

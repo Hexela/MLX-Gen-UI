@@ -23,4 +23,14 @@ struct GenerationTaskValidatorTests {
 
         #expect(GenerationTaskValidator().issues(in: task).isEmpty)
     }
+
+    /// Seeds outside the backend's supported unsigned 32-bit range are rejected.
+    @Test(arguments: [-1, GenerationTaskValidator.maximumSeed + 1])
+    func invalidSeedIsReported(seed: Int) {
+        var task = GenerationPreset.quickTextPreview.makeTask()
+        task.prompt = "A paper boat floating down a sunlit stream."
+        task.seed = seed
+
+        #expect(GenerationTaskValidator().issues(in: task).contains { $0.id == "seed" })
+    }
 }
