@@ -222,6 +222,7 @@ final class AppModel {
             let outputURL = GenerationBatch.outputURL(
                 baseURL: submittedTask.outputURL,
                 seed: seed,
+                modelIdentifier: submittedTask.modelIdentifier,
                 createdAt: .now,
                 moviesDirectory: homeDirectory.appending(path: "Movies")
             )

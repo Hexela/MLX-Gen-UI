@@ -21,14 +21,31 @@ struct GenerationBatch: Sendable {
         return Array(seeds)
     }
 
-    /// Creates a final MP4 URL whose name identifies both its creation time and seed.
-    static func outputURL(baseURL: URL?, seed: Int, createdAt: Date, moviesDirectory: URL) -> URL {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        let timestamp = formatter.string(from: createdAt)
-
+    /// Creates a final MP4 URL whose name identifies its creation time, seed, and model.
+    static func outputURL(
+        baseURL: URL?,
+        seed: Int,
+        modelIdentifier: String,
+        createdAt: Date,
+        moviesDirectory: URL,
+        timeZone: TimeZone = .current
+    ) -> URL {
+        let timestamp = createdAt.formatted(
+            .verbatim(
+                "\(year: .defaultDigits)\(month: .twoDigits)\(day: .twoDigits)\(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased))\(minute: .twoDigits)",
+                locale: Locale(identifier: "en_US_POSIX"),
+                timeZone: timeZone,
+                calendar: Calendar(identifier: .gregorian)
+            )
+        )
         let directory = baseURL?.deletingLastPathComponent() ?? moviesDirectory
-        let baseName = baseURL?.deletingPathExtension().lastPathComponent ?? "mlxgen"
-        return directory.appending(path: "\(baseName)-\(timestamp)-seed-\(seed).mp4")
+        let repositoryName = modelIdentifier.split(separator: "/").last.map(String.init) ?? "model"
+        let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
+        let safeModelName = repositoryName
+            .components(separatedBy: allowedCharacters.inverted)
+            .filter { $0.isEmpty == false }
+            .joined(separator: "-")
+        let modelName = safeModelName.isEmpty ? "model" : safeModelName
+        return directory.appending(path: "\(timestamp)-\(seed)-\(modelName).mp4")
     }
 }
