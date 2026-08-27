@@ -23,7 +23,7 @@ The project is in active development. The current foundation provides:
 
 Enter the desired finished duration on the Create Video screen. When the request exceeds the selected Wan model's recommended shot length, MLXGenUI automatically generates the required segments sequentially, extracts an ordered handover window, and joins the results into one MP4. Text-to-video jobs using Wan A14B require the paired A14B image-to-video model for continuation; the Ready Check identifies that requirement before generation starts.
 
-Intermediate files and a machine-readable run manifest are retained under Application Support if a generation is cancelled or interrupted. The final output is moved to the selected destination only after assembly succeeds.
+Intermediate files and a machine-readable run manifest are retained under `/tmp/MLXGenUI/LongVideoRuns` if a generation is cancelled or interrupted. The final output is moved to the selected destination only after assembly succeeds. macOS may clear these temporary workspaces automatically.
 
 ## Requirements
 
@@ -71,4 +71,3 @@ Generation runs locally. The app does not upload prompts or media. MLX-Gen model
 ## Contributing
 
 Contributions are welcome. Please keep changes focused, add Swift Testing coverage for domain logic, and build both the app and DocC documentation before opening a pull request. Public and architectural APIs must have current DocC comments.
-

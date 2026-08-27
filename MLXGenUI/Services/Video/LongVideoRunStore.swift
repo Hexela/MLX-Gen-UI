@@ -2,17 +2,27 @@ import Foundation
 
 /// Persists a run manifest alongside its intermediate video files.
 actor LongVideoRunStore {
+    /// Root directory for transient generation workspaces.
+    private let rootURL: URL
+
+    /// Creates a store rooted in `/tmp`, or in an injected directory for tests.
+    ///
+    /// - Parameter rootURL: Directory that contains per-run workspaces.
+    init(
+        rootURL: URL = URL(filePath: "/tmp", directoryHint: .isDirectory)
+            .appending(path: "MLXGenUI/LongVideoRuns", directoryHint: .isDirectory)
+    ) {
+        self.rootURL = rootURL
+    }
+
     /// Creates and returns a private workspace for a new run.
     func createWorkspace(for runIdentifier: UUID) throws -> URL {
-        let root = try FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
+        let workspaceURL = rootURL.appending(
+            path: runIdentifier.uuidString,
+            directoryHint: .isDirectory
         )
-        .appending(path: "MLXGenUI/LongVideoRuns/\(runIdentifier.uuidString)", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        return root
+        try FileManager.default.createDirectory(at: workspaceURL, withIntermediateDirectories: true)
+        return workspaceURL
     }
 
     /// Atomically writes the latest resumable run state.
