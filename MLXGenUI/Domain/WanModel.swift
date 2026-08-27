@@ -16,6 +16,8 @@ struct WanModel: Identifiable, Equatable, Hashable, Sendable {
     let recommendedSegmentFrames: Int
     /// Whether the model uses two-transformer boundary routing and accepts secondary guidance.
     let supportsSecondaryGuidance: Bool
+    /// Required pixel increment for both spatial dimensions after VAE encoding and transformer patchification.
+    let spatialDimensionMultiple: Int
     /// Ordered frame counts accepted as continuation context.
     let supportedContextFrameCounts: [Int]
     /// The paired image-to-video model used to continue a text-generated first segment.
@@ -31,6 +33,7 @@ struct WanModel: Identifiable, Equatable, Hashable, Sendable {
             summary: "The preferred quality-focused model for video generated entirely from text.",
             recommendedSegmentFrames: 81,
             supportsSecondaryGuidance: true,
+            spatialDimensionMultiple: 16,
             supportedContextFrameCounts: [5, 9, 13],
             continuationModelIdentifier: "AbstractFramework/wan2.2-i2v-a14b-diffusers-8bit"
         ),
@@ -42,6 +45,7 @@ struct WanModel: Identifiable, Equatable, Hashable, Sendable {
             summary: "Animates a starting image while preserving its subject and composition.",
             recommendedSegmentFrames: 81,
             supportsSecondaryGuidance: true,
+            spatialDimensionMultiple: 16,
             supportedContextFrameCounts: [5, 9, 13],
             continuationModelIdentifier: "AbstractFramework/wan2.2-i2v-a14b-diffusers-8bit"
         ),
@@ -53,6 +57,7 @@ struct WanModel: Identifiable, Equatable, Hashable, Sendable {
             summary: "A smaller package that supports both text and starting-image workflows.",
             recommendedSegmentFrames: 121,
             supportsSecondaryGuidance: false,
+            spatialDimensionMultiple: 32,
             supportedContextFrameCounts: [],
             continuationModelIdentifier: nil
         )
@@ -72,5 +77,15 @@ struct WanModel: Identifiable, Equatable, Hashable, Sendable {
     /// - Returns: The matching model, or `nil` when it is not in the curated catalog.
     static func model(withIdentifier identifier: String) -> WanModel? {
         catalog.first { $0.id == identifier }
+    }
+
+    /// Rounds a positive pixel dimension up to the nearest supported patch boundary.
+    ///
+    /// - Parameter dimension: Requested width or height in pixels.
+    /// - Returns: The smallest supported dimension that is not less than the request.
+    func adjustedSpatialDimension(_ dimension: Int) -> Int {
+        let positiveDimension = max(dimension, spatialDimensionMultiple)
+        return Int(ceil(Double(positiveDimension) / Double(spatialDimensionMultiple)))
+            * spatialDimensionMultiple
     }
 }

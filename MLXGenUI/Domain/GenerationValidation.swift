@@ -40,6 +40,16 @@ struct GenerationTaskValidator: Sendable {
         }
         if task.width <= 0 || task.height <= 0 {
             issues.append(.init(id: "canvas", kind: .invalidValue, message: "Width and height must be positive."))
+        } else if let model = WanModel.model(withIdentifier: task.modelIdentifier),
+                  task.width.isMultiple(of: model.spatialDimensionMultiple) == false
+                    || task.height.isMultiple(of: model.spatialDimensionMultiple) == false {
+            issues.append(
+                .init(
+                    id: "canvasMultiple",
+                    kind: .invalidValue,
+                    message: "Width and height must be multiples of \(model.spatialDimensionMultiple) for this model."
+                )
+            )
         }
         if task.frameCount <= 0 || task.framesPerSecond <= 0 {
             issues.append(.init(id: "timing", kind: .invalidValue, message: "Frames and frame rate must be positive."))

@@ -33,4 +33,26 @@ struct GenerationTaskValidatorTests {
 
         #expect(GenerationTaskValidator().issues(in: task).contains { $0.id == "seed" })
     }
+
+    /// The 5B model rejects dimensions that MLX-Gen would otherwise silently expand.
+    @Test func ti2vCanvasMustUse32PixelIncrements() {
+        var task = GenerationPreset.quickTextPreview.makeTask()
+        task.prompt = "A paper boat floating down a sunlit stream."
+        task.modelIdentifier = "AbstractFramework/wan2.2-ti2v-5b-diffusers-8bit"
+        task.height = 240
+
+        #expect(GenerationTaskValidator().issues(in: task).contains { $0.id == "canvasMultiple" })
+
+        task.height = 256
+        #expect(GenerationTaskValidator().issues(in: task).isEmpty)
+    }
+
+    /// A14B models use their smaller 16-pixel spatial increment.
+    @Test func a14BCanvasUses16PixelIncrements() {
+        var task = GenerationPreset.quickTextPreview.makeTask()
+        task.prompt = "A paper boat floating down a sunlit stream."
+        task.height = 240
+
+        #expect(GenerationTaskValidator().issues(in: task).isEmpty)
+    }
 }

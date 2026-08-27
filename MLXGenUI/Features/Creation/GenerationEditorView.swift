@@ -62,6 +62,7 @@ struct GenerationEditorView: View {
         .task {
             usesFixedSeed = appModel.task.seed != nil
             selectCompatibleModel(for: appModel.task.workflow)
+            enforceCanvasRequirements()
             refreshSourceImageDetails()
             await appModel.refreshModelStatuses()
         }
@@ -70,6 +71,7 @@ struct GenerationEditorView: View {
         }
         .onChange(of: appModel.task.identifier) {
             usesFixedSeed = appModel.task.seed != nil
+            enforceCanvasRequirements()
         }
     }
 
@@ -124,6 +126,9 @@ struct GenerationEditorView: View {
                 }
                 .accessibilityHint("Selects the Wan model used for this generation")
                 .help("Selects the generation model. The first compatible model is the recommended quality-focused choice; TI2V 5B uses less storage and supports both workflows.")
+                .onChange(of: task.wrappedValue.modelIdentifier) {
+                    enforceCanvasRequirements()
+                }
             } else {
                 LabeledContent("Model", value: "Selecting a compatible model…")
                     .foregroundStyle(.secondary)
@@ -208,17 +213,33 @@ struct GenerationEditorView: View {
 
     /// Controls for video geometry and timing.
     private func outputSection(task: Binding<GenerationTask>) -> some View {
-        Section("Video") {
+        let dimensionMultiple = selectedModel?.spatialDimensionMultiple ?? 1
+
+        return Section("Video") {
             HStack {
-                TextField("Width", value: task.width, format: .number)
+                Stepper(
+                    "Width: \(task.wrappedValue.width) px",
+                    value: task.width,
+                    in: dimensionMultiple...4096,
+                    step: dimensionMultiple
+                )
                     .help("Sets horizontal resolution. 832 is a good quality landscape width; 480 is faster and uses less memory.")
                 Text("×")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
-                TextField("Height", value: task.height, format: .number)
+                Stepper(
+                    "Height: \(task.wrappedValue.height) px",
+                    value: task.height,
+                    in: dimensionMultiple...4096,
+                    step: dimensionMultiple
+                )
                     .help("Sets vertical resolution. Use 480 for landscape or 832 for portrait, paired with the corresponding width.")
             }
             LabeledContent("Canvas", value: "\(task.wrappedValue.width) × \(task.wrappedValue.height) pixels")
+            if dimensionMultiple > 1 {
+                Text("This model requires width and height to be multiples of \(dimensionMultiple) pixels.")
+                    .foregroundStyle(.secondary)
+            }
             Stepper("Frame rate: \(task.wrappedValue.framesPerSecond) fps", value: task.framesPerSecond, in: 1...60)
                 .help("Controls playback smoothness. 16 fps is the recommended model-native default; higher values require more generated frames for the same duration.")
             TextField(
@@ -389,6 +410,11 @@ struct GenerationEditorView: View {
         appModel.modelStatuses[appModel.task.modelIdentifier] ?? .checking
     }
 
+    /// The curated model currently selected in the editor.
+    private var selectedModel: WanModel? {
+        WanModel.model(withIdentifier: appModel.task.modelIdentifier)
+    }
+
     /// The calculated segment plan for the editor's current values.
     private var longVideoPlan: LongVideoPlan? {
         guard let model = WanModel.model(withIdentifier: appModel.task.modelIdentifier) else { return nil }
@@ -489,5 +515,13 @@ struct GenerationEditorView: View {
             return
         }
         appModel.task.modelIdentifier = preferredModel.id
+        enforceCanvasRequirements()
+    }
+
+    /// Rounds imported, preset, or previously entered dimensions to the selected model's patch boundary.
+    private func enforceCanvasRequirements() {
+        guard let model = selectedModel else { return }
+        appModel.task.width = model.adjustedSpatialDimension(appModel.task.width)
+        appModel.task.height = model.adjustedSpatialDimension(appModel.task.height)
     }
 }
