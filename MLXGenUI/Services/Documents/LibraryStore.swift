@@ -68,6 +68,16 @@ actor LibraryStore {
         return updated
     }
 
+    /// Removes one generation attempt and persists the resulting history.
+    func remove(
+        _ record: GenerationHistoryRecord,
+        from records: [GenerationHistoryRecord]
+    ) throws -> [GenerationHistoryRecord] {
+        let updated = records.filter { $0.id != record.id }
+        try persist(updated, to: directoryURL.appending(path: "GenerationHistory.json"))
+        return updated
+    }
+
     /// Loads generated-video history, returning an empty library when no file exists.
     func loadVideos() throws -> [GeneratedVideoRecord] {
         try load(
@@ -87,6 +97,22 @@ actor LibraryStore {
         var updated = records.filter { $0.id != record.id }
         updated.append(record)
         updated.sort { $0.createdAt > $1.createdAt }
+        try persist(updated, to: directoryURL.appending(path: "GeneratedVideos.json"))
+        return updated
+    }
+
+    /// Moves a generated artifact to the Trash when it still exists.
+    func moveVideoToTrash(_ record: GeneratedVideoRecord) throws {
+        guard fileManager.fileExists(atPath: record.outputURL.path) else { return }
+        try fileManager.trashItem(at: record.outputURL, resultingItemURL: nil)
+    }
+
+    /// Removes one generated-video record and persists the resulting library.
+    func remove(
+        _ record: GeneratedVideoRecord,
+        from records: [GeneratedVideoRecord]
+    ) throws -> [GeneratedVideoRecord] {
+        let updated = records.filter { $0.id != record.id }
         try persist(updated, to: directoryURL.appending(path: "GeneratedVideos.json"))
         return updated
     }

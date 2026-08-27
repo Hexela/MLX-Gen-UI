@@ -177,6 +177,27 @@ final class AppModel {
         selection = .createVideo
     }
 
+    /// Deletes one saved generation-attempt snapshot.
+    func delete(_ record: GenerationHistoryRecord) async {
+        do {
+            generationHistory = try await libraryStore.remove(record, from: generationHistory)
+            libraryError = nil
+        } catch {
+            libraryError = error.localizedDescription
+        }
+    }
+
+    /// Moves a generated video to the Trash and removes it from the video library.
+    func delete(_ record: GeneratedVideoRecord) async {
+        do {
+            try await libraryStore.moveVideoToTrash(record)
+            generatedVideos = try await libraryStore.remove(record, from: generatedVideos)
+            libraryError = nil
+        } catch {
+            libraryError = error.localizedDescription
+        }
+    }
+
     /// Replaces the editor with a task imported from a portable document.
     ///
     /// - Parameter document: The decoded portable task document.

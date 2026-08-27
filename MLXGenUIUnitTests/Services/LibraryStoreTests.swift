@@ -42,6 +42,24 @@ struct LibraryStoreTests {
         #expect(loaded == [record])
     }
 
+    /// Removing a generated video should persist the updated library.
+    @Test func generatedVideoRemovalPersists() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let store = LibraryStore(directoryURL: directoryURL)
+        let record = GeneratedVideoRecord(
+            id: UUID(),
+            task: GenerationPreset.quickTextPreview.makeTask(),
+            outputURL: directoryURL.appending(path: "result.mp4"),
+            createdAt: .now
+        )
+
+        let records = try await store.add(record, to: [])
+        _ = try await store.remove(record, from: records)
+
+        #expect(try await store.loadVideos().isEmpty)
+    }
+
     /// Video records written before timing was introduced should continue to decode.
     @Test func generatedVideoWithoutTimingRemainsCompatible() throws {
         let record = GeneratedVideoRecord(
@@ -82,5 +100,22 @@ struct LibraryStoreTests {
         #expect(loaded == [secondRecord, firstRecord])
         #expect(loaded.last?.task.sourceImageURL == firstTask.sourceImageURL)
         #expect(loaded.first?.task.guidance == 6)
+    }
+
+    /// Removing a generation attempt should persist the updated history.
+    @Test func generationHistoryRemovalPersists() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let store = LibraryStore(directoryURL: directoryURL)
+        let record = GenerationHistoryRecord(
+            id: UUID(),
+            task: GenerationPreset.quickTextPreview.makeTask(),
+            attemptedAt: .now
+        )
+
+        let records = try await store.add(record, to: [])
+        _ = try await store.remove(record, from: records)
+
+        #expect(try await store.loadGenerationHistory().isEmpty)
     }
 }

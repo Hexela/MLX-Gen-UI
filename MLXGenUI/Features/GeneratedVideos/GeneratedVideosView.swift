@@ -26,6 +26,9 @@ struct GeneratedVideosView: View {
                             .foregroundStyle(.secondary)
                     }
                     .tag(record)
+                    .contextMenu {
+                        DeleteGeneratedVideoButton(record: record)
+                    }
                 }
             }
         } detail: {
@@ -36,6 +39,11 @@ struct GeneratedVideosView: View {
             }
         }
         .navigationTitle("Generated Videos")
+        .onChange(of: appModel.generatedVideos) { _, videos in
+            if let selection, videos.contains(where: { $0.id == selection.id }) == false {
+                self.selection = nil
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             if let error = appModel.libraryError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -76,9 +84,47 @@ private struct GeneratedVideoDetailView: View {
                 LabeledContent("Created", value: record.createdAt.formatted(.dateTime))
                 LabeledContent("File", value: record.outputURL.path)
                     .textSelection(.enabled)
+
+                DeleteGeneratedVideoButton(record: record)
             }
             .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(record.outputURL.lastPathComponent)
+        .onChange(of: record.id) {
+            player.pause()
+            player.replaceCurrentItem(with: AVPlayerItem(url: record.outputURL))
+        }
+        .onDisappear {
+            player.pause()
+        }
+    }
+}
+
+/// Offers a confirmed, accessible deletion control for one generated artifact.
+private struct DeleteGeneratedVideoButton: View {
+    @Environment(AppModel.self) private var appModel
+    let record: GeneratedVideoRecord
+    @State private var isConfirmingDeletion = false
+
+    var body: some View {
+        Button("Delete Video", systemImage: "trash", role: .destructive) {
+            isConfirmingDeletion = true
+        }
+        .buttonStyle(.borderless)
+        .help("Move this generated video to the Trash")
+        .confirmationDialog(
+            "Move Video to Trash?",
+            isPresented: $isConfirmingDeletion,
+            titleVisibility: .visible
+        ) {
+            Button("Move to Trash", role: .destructive) {
+                Task {
+                    await appModel.delete(record)
+                }
+            }
+        } message: {
+            Text("This removes the video from Generated Videos and moves its file to the Trash.")
+        }
     }
 }
