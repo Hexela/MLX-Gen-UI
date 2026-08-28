@@ -10,33 +10,39 @@ struct GeneratedVideosView: View {
 
     /// The generated-video library hierarchy.
     var body: some View {
-        NavigationSplitView {
-            if appModel.generatedVideos.isEmpty {
-                ContentUnavailableView(
-                    "No Generated Videos",
-                    systemImage: "play.rectangle.on.rectangle",
-                    description: Text("Successful generations will be retained here.")
-                )
-            } else {
-                List(appModel.generatedVideos, selection: $selection) { record in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(record.task.name)
-                            .font(.headline)
-                        Text(record.createdAt, format: .dateTime)
-                            .foregroundStyle(.secondary)
-                    }
-                    .tag(record)
-                    .contextMenu {
-                        DeleteGeneratedVideoButton(record: record)
+        HSplitView {
+            Group {
+                if appModel.generatedVideos.isEmpty {
+                    ContentUnavailableView(
+                        "No Generated Videos",
+                        systemImage: "play.rectangle.on.rectangle",
+                        description: Text("Successful generations will be retained here.")
+                    )
+                } else {
+                    List(appModel.generatedVideos, selection: $selection) { record in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(record.task.name)
+                                .font(.headline)
+                            Text(record.createdAt, format: .dateTime)
+                                .foregroundStyle(.secondary)
+                        }
+                        .tag(record)
+                        .contextMenu {
+                            DeleteGeneratedVideoButton(record: record)
+                        }
                     }
                 }
             }
-        } detail: {
-            if let selection {
-                GeneratedVideoDetailView(record: selection)
-            } else {
-                ContentUnavailableView("Choose a Video", systemImage: "play.rectangle")
+            .frame(minWidth: 220, idealWidth: 260, maxWidth: 340)
+
+            Group {
+                if let selection {
+                    GeneratedVideoDetailView(record: selection)
+                } else {
+                    ContentUnavailableView("Choose a Video", systemImage: "play.rectangle")
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Generated Videos")
         .onChange(of: appModel.generatedVideos) { _, videos in
@@ -75,8 +81,11 @@ private struct GeneratedVideoDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VideoPlayer(player: player)
-                    .aspectRatio(16 / 9, contentMode: .fit)
-                    .frame(minHeight: 280)
+                    .aspectRatio(
+                        Double(record.task.width) / Double(record.task.height),
+                        contentMode: .fit
+                    )
+                    .frame(maxWidth: .infinity)
 
                 Text(record.task.name)
                     .font(.title2)
@@ -87,7 +96,8 @@ private struct GeneratedVideoDetailView: View {
 
                 DeleteGeneratedVideoButton(record: record)
             }
-            .padding()
+            .padding(.vertical, 12)
+            .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle(record.outputURL.lastPathComponent)
