@@ -111,6 +111,9 @@ struct GenerationEditorView: View {
             .pickerStyle(.segmented)
             .help("Choose Text to Video to create everything from a prompt, or Image to Video when you want to animate a specific starting image.")
             .onChange(of: task.wrappedValue.workflow) { _, workflow in
+                if workflow != .imageToVideo, task.wrappedValue.createsLoop {
+                    task.wrappedValue.configureLoop(false)
+                }
                 selectCompatibleModel(for: workflow)
             }
 
@@ -157,6 +160,13 @@ struct GenerationEditorView: View {
                         .help("Choose a clear, high-resolution image with the same shape as the video canvas for the most stable result.")
                     }
                 }
+
+                Toggle("Create loop", isOn: task.createsLoop)
+                    .disabled(task.wrappedValue.sourceImageURL == nil)
+                    .help("Uses the starting image as the final image and adds motion guidance for a seamless 81-frame loop.")
+                    .onChange(of: task.wrappedValue.createsLoop) { _, isEnabled in
+                        task.wrappedValue.configureLoop(isEnabled)
+                    }
 
                 if let sourceImageDetails {
                     LabeledContent("Image resolution", value: sourceImageDetails.resolutionDescription)

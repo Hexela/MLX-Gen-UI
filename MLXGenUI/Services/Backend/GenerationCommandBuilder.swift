@@ -45,6 +45,9 @@ struct GenerationCommandBuilder: Sendable {
         }
         if let sourceImageURL = task.sourceImageURL {
             arguments += ["--image", sourceImageURL.path]
+            if task.createsLoop {
+                arguments += ["--last-image", sourceImageURL.path]
+            }
         }
         if contextFrameURLs.isEmpty == false {
             arguments.append("--context-frames")

@@ -38,6 +38,22 @@ struct GenerationCommandBuilderTests {
         #expect(command.arguments[imageIndex + 1] == "/tmp/source image.png")
     }
 
+    /// Loop generation should use the starting image as both endpoint images.
+    @Test func loopUsesStartingImageAsLastImage() throws {
+        var task = GenerationPreset.animateImage.makeTask()
+        task.sourceImageURL = URL(filePath: "/tmp/source image.png")
+        task.configureLoop(true)
+
+        let command = try GenerationCommandBuilder().makeCommand(
+            for: task,
+            executableURL: URL(filePath: "/tmp/mlxgen"),
+            outputURL: URL(filePath: "/tmp/output.mp4")
+        )
+
+        let lastImageIndex = try #require(command.arguments.firstIndex(of: "--last-image"))
+        #expect(command.arguments[lastImageIndex + 1] == "/tmp/source image.png")
+    }
+
     /// The single-transformer 5B model must not receive the A14B-only secondary guidance option.
     @Test func fiveBModelOmitsSecondaryGuidance() throws {
         var task = GenerationPreset.animateImage.makeTask()

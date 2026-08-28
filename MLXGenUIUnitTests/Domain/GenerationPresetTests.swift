@@ -16,6 +16,7 @@ struct GenerationPresetTests {
         #expect(task.frameCount > 0)
         #expect(task.framesPerSecond > 0)
         #expect(task.writesMetadata)
+        #expect(task.negativePrompt == GenerationTask.defaultNegativePrompt)
     }
 
     /// Creating a preset twice should produce different document identities.
@@ -24,5 +25,28 @@ struct GenerationPresetTests {
         let second = GenerationPreset.quickTextPreview.makeTask()
 
         #expect(first.identifier != second.identifier)
+    }
+
+    /// Enabling and disabling loop creation should restore the original task values.
+    @Test func loopConfigurationIsReversible() {
+        var task = GenerationPreset.quickTextPreview.makeTask()
+        task.prompt = "A dancer turns slowly."
+        let original = task
+
+        task.configureLoop(true)
+
+        #expect(task.createsLoop)
+        #expect(task.frameCount == 81)
+        #expect(task.targetFrameCount == 81)
+        #expect(task.prompt.hasSuffix(GenerationTask.loopPrompt))
+        #expect(task.negativePrompt.hasSuffix(GenerationTask.loopNegativePrompt))
+
+        task.configureLoop(false)
+
+        #expect(task.prompt == original.prompt)
+        #expect(task.negativePrompt == original.negativePrompt)
+        #expect(task.frameCount == original.frameCount)
+        #expect(task.targetDurationSeconds == original.targetDurationSeconds)
+        #expect(task.createsLoop == false)
     }
 }
