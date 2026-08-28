@@ -252,13 +252,25 @@ struct GenerationEditorView: View {
             }
             Stepper("Frame rate: \(task.wrappedValue.framesPerSecond) fps", value: task.framesPerSecond, in: 1...60)
                 .help("Controls playback smoothness. 16 fps is the recommended model-native default; higher values require more generated frames for the same duration.")
-            TextField(
-                "Desired duration (seconds)",
-                value: targetDurationBinding,
-                format: .number.precision(.fractionLength(0...2))
-            )
-            .accessibilityHint("Sets the exact duration of the finished, automatically assembled video")
-            .help("Sets the finished video length. Short clips are quicker and more consistent; longer clips are generated as multiple joined segments.")
+            Picker("Specify length in", selection: lengthUsesFramesBinding) {
+                Text("Seconds").tag(false)
+                Text("Frames").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .help("Choose whether to enter the finished video length as playback time or as an exact number of frames.")
+            if task.wrappedValue.targetDurationSeconds == nil {
+                TextField("Desired length (frames)", value: task.frameCount, format: .number.grouping(.never))
+                    .accessibilityHint("Sets the number of frames in the finished video")
+                    .help("Sets the finished video length in frames. At the selected frame rate, \(task.wrappedValue.frameCount) frames lasts about \(frameBasedDurationDescription(for: task.wrappedValue)).")
+            } else {
+                TextField(
+                    "Desired length (seconds)",
+                    value: targetDurationBinding,
+                    format: .number.precision(.fractionLength(0...2))
+                )
+                .accessibilityHint("Sets the duration of the finished, automatically assembled video")
+                .help("Sets the finished video length in seconds. Short clips are quicker and more consistent; longer clips are generated as multiple joined segments.")
+            }
             if let plan = longVideoPlan {
                 LabeledContent(
                     "Generation plan",
@@ -457,6 +469,26 @@ struct GenerationEditorView: View {
             },
             set: { appModel.task.targetDurationSeconds = $0 }
         )
+    }
+
+    /// Selects frame- or second-based length entry while retaining an equivalent duration.
+    private var lengthUsesFramesBinding: Binding<Bool> {
+        Binding(
+            get: { appModel.task.targetDurationSeconds == nil },
+            set: { usesFrames in
+                if usesFrames {
+                    appModel.task.specifyLengthInFrames()
+                } else {
+                    appModel.task.specifyLengthInSeconds()
+                }
+            }
+        )
+    }
+
+    /// Formats the playback time represented by a frame-based length.
+    private func frameBasedDurationDescription(for task: GenerationTask) -> String {
+        (Double(task.frameCount) / Double(task.framesPerSecond))
+            .formatted(.number.precision(.fractionLength(0...2))) + " seconds"
     }
 
     /// A nonoptional binding shown only while the task has a fixed seed.

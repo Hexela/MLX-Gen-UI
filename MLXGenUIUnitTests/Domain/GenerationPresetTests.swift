@@ -49,4 +49,19 @@ struct GenerationPresetTests {
         #expect(task.targetDurationSeconds == original.targetDurationSeconds)
         #expect(task.createsLoop == false)
     }
+
+    /// Switching timing units preserves the requested playback length.
+    @Test func switchingLengthUnitsPreservesDuration() {
+        var task = GenerationPreset.quickTextPreview.makeTask()
+        task.targetDurationSeconds = 3.1
+
+        task.specifyLengthInFrames()
+
+        #expect(task.targetDurationSeconds == nil)
+        #expect(task.frameCount == 50)
+
+        task.specifyLengthInSeconds()
+
+        #expect(task.targetDurationSeconds == 3.125)
+    }
 }

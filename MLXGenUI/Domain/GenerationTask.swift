@@ -82,6 +82,17 @@ struct GenerationTask: Codable, Equatable, Hashable, Sendable {
         return max(Int(ceil(targetDurationSeconds * Double(framesPerSecond))), 1)
     }
 
+    /// Switches length entry to frames while preserving the current requested duration.
+    mutating func specifyLengthInFrames() {
+        frameCount = targetFrameCount
+        targetDurationSeconds = nil
+    }
+
+    /// Switches length entry to seconds while preserving the current frame-based duration.
+    mutating func specifyLengthInSeconds() {
+        targetDurationSeconds = Double(frameCount) / Double(framesPerSecond)
+    }
+
     /// Applies or removes the reversible prompt and timing defaults for loop creation.
     mutating func configureLoop(_ isEnabled: Bool) {
         createsLoop = isEnabled
