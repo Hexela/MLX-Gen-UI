@@ -12,20 +12,14 @@ struct GenerationTask: Codable, Equatable, Hashable, Sendable {
 
     /// Motion guidance appended while seamless-loop generation is enabled.
     static let loopPrompt = """
-        Smooth, natural, cyclical movement that gradually returns to the
-        starting pose and composition. Seamless loop with continuous motion
-        through the loop point. Consistent appearance, lighting and background.
-        Static locked camera, no cuts or transitions. Realistic natural motion,
-        cinematic quality.
+        Smooth, natural, cyclical movement that gradually returns to the starting pose and composition. Seamless loop with continuous motion
+        through the loop point. Consistent appearance, lighting and background. Static locked camera, no cuts or transitions. Realistic natural motion, cinematic quality.
         """
 
     /// Exclusions appended while seamless-loop generation is enabled.
     static let loopNegativePrompt = """
-        abrupt movement, sudden movement, stopping motion, motion discontinuity,
-        drifting composition, permanent pose change, camera movement, camera pan,
-        camera tilt, camera zoom, camera rotation, scene transition, cut,
-        changing background, changing lighting, flickering, temporal inconsistency,
-        jitter, ghosting, warping, morphing
+        abrupt movement, sudden movement, stopping motion, motion discontinuity, drifting composition, permanent pose change, camera movement, camera pan,
+        camera tilt, camera zoom, camera rotation, scene transition, cut, changing background, changing lighting, flickering, temporal inconsistency, jitter, ghosting, warping, morphing
         """
 
     /// The task document format version.

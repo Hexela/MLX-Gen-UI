@@ -51,8 +51,6 @@ struct ModelsView: View {
                     }
                 }
             }
-
-            BackendOperationView()
         }
         .formStyle(.grouped)
         .navigationTitle("Models")
